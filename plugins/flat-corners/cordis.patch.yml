@@ -1,0 +1,3 @@
+- insert:
+    - id: flat-corners
+      name: '@local/flat-corners'

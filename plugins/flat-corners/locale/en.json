@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Square Corners",
+    "description": "Removes every corner radius in the DSH Web interface for a flat, square look."
+  }
+}

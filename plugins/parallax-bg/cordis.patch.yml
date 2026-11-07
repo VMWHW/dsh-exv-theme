@@ -1,0 +1,3 @@
+- insert:
+    - id: parallax-bg
+      name: '@local/parallax-bg'
