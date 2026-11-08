@@ -100,4 +100,4 @@ node tools/build-parallax.mjs
 
 有问题或建议请开 Issue，并尽量附上：DSH 版本、Windows 版本、使用的是 Release 包还是源码自建、以及 `install.ps1` 的完整输出。
 
-版本：2.0.0
+版本：2.0.1

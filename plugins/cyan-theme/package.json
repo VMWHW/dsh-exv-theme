@@ -1,6 +1,6 @@
 {
   "name": "@local/cyan-theme",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "type": "module",
   "description": "Pure black surfaces with cyan text and translucent cyan controls.",
