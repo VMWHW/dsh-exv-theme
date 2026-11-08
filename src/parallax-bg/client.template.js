@@ -319,9 +319,6 @@ const THEME_DEFAULTS = {
       const waves = [];
       const pointer = { x: -10000, y: -10000 };
       let pressing = false;
-      /* 被毛玻璃面板盖住的区域不画：既省绘制，也让面板背后的合成结果稳定下来 */
-      let occluderRects = [];
-      let occludersAt = -1;
 
       const config = () => (getConfig ? getConfig() : null) || {};
       const pointerConfig = () => config().pointer || {};
@@ -536,11 +533,6 @@ const THEME_DEFAULTS = {
         const half = CELL / 2;
         const touch = (col, row) => {
           if (col < 0 || row < 0 || col > maxColIndex || row > maxRowIndex) return;
-          const px = 6 + col * STEP + half;
-          const py = row * STEP + CELL / 2;
-          for (const rect of occluderRects) {
-            if (px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h) return;
-          }
           const key = col + ':' + row;
           const cell = litCells.get(key);
           if (cell) {
@@ -827,41 +819,8 @@ const THEME_DEFAULTS = {
         }
       };
 
-      const refreshOccluders = () => {
-        const rects = [];
-        const push = (element) => {
-          if (!element) return;
-          const rect = element.getBoundingClientRect();
-          if (rect.width < 4 || rect.height < 4) return;
-          rects.push({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
-        };
-        try {
-          push(document.querySelector('[data-dsh-sidebar]'));
-          push(document.querySelector('[data-dsh-rightbar]'));
-          push(document.querySelector('header[data-window-drag]'));
-          push(document.querySelector('[data-dsh-composer]'));
-          if (document.documentElement.hasAttribute('data-windows-titlebar')) {
-            const raw = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsh-windows-titlebar-height'));
-            if (Number.isFinite(raw) && raw > 0) rects.push({ x: 0, y: 0, w: width, h: raw });
-          }
-        } catch (error) {
-          /* ignore */
-        }
-        occluderRects = rects;
-        occludersAt = performance.now();
-      };
-
       const draw = () => {
-        if (occludersAt < 0 || performance.now() - occludersAt > 800) refreshOccluders();
         context.clearRect(0, 0, width, height);
-        const clipped = occluderRects.length > 0;
-        if (clipped) {
-          context.save();
-          context.beginPath();
-          context.rect(0, 0, width, height);
-          for (const rect of occluderRects) context.rect(rect.x, rect.y, rect.w, rect.h);
-          context.clip('evenodd');
-        }
         const glow = headGlowSprite();
         const glowRadius = STEP * 2.4;
         for (const string of strings) {
@@ -900,7 +859,6 @@ const THEME_DEFAULTS = {
         drawCharacterLight();
         drawWaves(performance.now());
         context.globalCompositeOperation = 'source-over';
-        if (clipped) context.restore();
       };
 
       const tick = (now) => {

@@ -423,8 +423,8 @@ const VV_OPTIONS = [
       '[data-dsh-sidebar]::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
       /* 顶部栏恢复毛玻璃：Windows 标题条 + 会话头。
          标题条多盖 2px 且这 2px 不填底色，专门盖住两段毛玻璃之间的接缝。 */
-      'html[data-windows-titlebar] [class*="_frame"][class*="_frame"]::before { background: transparent !important; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
-      'header[data-window-drag] { background-color: transparent !important; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
+      /* 只给 Windows 标题条保留毛玻璃；会话头不再单独加，避免两层之间出现明暗分界 */
+      'html[data-windows-titlebar] [class*="_frame"][class*="_frame"]::before { backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
       /* Workspace parent row: distinguishable fill and a left accent. */
       '[class*="_projectRow"] { background-color: rgba(0, 255, 240, 0.10) !important; box-shadow: inset 2px 0 0 rgba(0, 255, 240, 0.55); }',
       /* Session hover card: theme surface and readable text. */
