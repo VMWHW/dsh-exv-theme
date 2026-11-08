@@ -69,6 +69,30 @@ node --check plugins/cyan-theme/client.js
 node --check plugins/flat-corners/client.js
 ```
 
+一次性跑完所有静态检查（语法、JSON、清单、占位符、产物未被 git 跟踪、缺输入时构建脚本是否正确报错）：
+
+```bash
+node tools/check.mjs
+```
+
+CI 也是跑这一条（见 `.github/workflows/verify.yml`）。
+
+## 打包发布
+
+构建产物就位后：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\package.ps1
+```
+
+它会：
+
+1. 把三个插件、安装/卸载脚本与文档收进 `dist\DSH-EXV-Theme-<版本>\`；
+2. 为 `plugins/` 下每个文件生成 `checksums.txt`（sha256）；
+3. 压缩成 `dist\DSH-EXV-Theme-<版本>.zip`，并打印体积与 zip 的 sha256。
+
+`checksums.txt` 会被 `install.ps1` 使用：解压后的包若包含该文件，安装前会逐个校验，任何不一致都会中止安装（不会改动系统）。缺少该文件时安装器会跳过校验，保持对旧包的兼容。
+
 ## 注意
 
 - 仓库根目录的 `install.cmd` / `install.ps1` 期望同级存在完整的 `plugins/`；从源码目录直接安装前必须先构建，否则 `parallax-bg` 会缺少 `client.js`。
