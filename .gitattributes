@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# The parallax template is embedded verbatim into the built bundle. Its bytes
+# must stay stable, otherwise rebuilding cannot reproduce the published sha256.
+src/parallax-bg/client.template.js -text
