@@ -1,0 +1,30 @@
+# ---- OS / editor ----
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+
+# ---- Node ----
+node_modules/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---- Local build / packaging artifacts ----
+*.zip
+dist/
+out/
+
+# Build inputs: third-party assets, not redistributed (see THIRD_PARTY_NOTICES.md)
+assets/
+vendor/
+
+# Build output of tools/build-parallax.mjs, shipped through Releases only
+plugins/parallax-bg/client.js
+
+# ---- Local scratch / backups ----
+*.bak
+*.bak.*
+*.tmp
+*.log
