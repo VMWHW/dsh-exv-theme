@@ -384,6 +384,25 @@ const VV_OPTIONS = [
       '[data-dsh-composer] [class*="primary"] svg { color: #00fff0 !important; }',
       '[data-dsh-composer] [class*="primary"]:hover:not(:disabled) { background-color: #00fff0 !important; color: #000 !important; box-shadow: 0 0 14px rgba(0, 255, 240, 0.40) !important; }',
       '[data-dsh-composer] [class*="primary"]:hover:not(:disabled) svg { color: #000 !important; }',
+      /* Selection toolbar ("引用文本"): frosted glass with a cyan hairline.
+         The shipped button uses a gray floating fill; the host exposes the
+         surface through data-text-interaction-surface, which is stable. */
+      '[data-text-interaction-surface] { display: flex !important; align-items: center; gap: 8px; padding: 2px; }',
+      '[data-text-interaction-surface] > button { background-color: rgba(0, 0, 0, 0.58) !important; border: 1px solid rgba(0, 255, 240, 0.55) !important; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.30), 0 0 18px rgba(0, 255, 240, 0.18) !important; color: #00fff0 !important; text-shadow: 0 0 10px rgba(0, 255, 240, 0.45); }',
+      '[data-text-interaction-surface] > button:hover:not(:disabled) { background-color: rgba(0, 255, 240, 0.18) !important; color: #00fff0 !important; border-color: #00fff0 !important; box-shadow: 0 0 22px rgba(0, 255, 240, 0.38), inset 0 0 0 1px rgba(0, 255, 240, 0.30) !important; }',
+      '[data-text-interaction-surface] > button:hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
+      /* The host's own quote surface is replaced by the themed selection bar
+         below; keep it measurable but invisible so its button stays clickable. */
+      '[data-text-interaction-surface] { visibility: hidden !important; pointer-events: none !important; }',
+      /* Themed selection toolbar. */
+      '[data-dsh-selection-toolbar] { position: fixed; z-index: 2147482000; pointer-events: auto; display: flex; align-items: center; gap: 4px; padding: 4px; background: rgba(0, 0, 0, 0.62); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); white-space: nowrap; animation: dsh-sel-in .12s ease-out; }',
+      '@keyframes dsh-sel-in { from { opacity: 0; } to { opacity: 1; } }',
+      /* 跟随悬停的滑块，和背景菜单那条分段滑条同一手感 */
+      '[data-dsh-sel-thumb] { position: absolute; left: 4px; top: 4px; bottom: 4px; width: 0; opacity: 0; background: rgba(0, 255, 240, 0.22); box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.50); transition: transform .16s cubic-bezier(.22, .61, .36, 1), width .16s cubic-bezier(.22, .61, .36, 1), opacity .12s ease; pointer-events: none; }',
+      '[data-dsh-selection-toolbar][data-hover] [data-dsh-sel-thumb] { opacity: 1; }',
+      '[data-dsh-selection-toolbar] > button { position: relative; border: none; background: transparent; color: #00fff0; font: 12px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: .05em; padding: 6px 9px; cursor: pointer; }',
+      '[data-dsh-selection-toolbar] > button:hover:not(:disabled) { background: transparent; color: #00fff0; }',
+      '[data-dsh-selection-toolbar] > span[data-flash] { color: rgba(0, 255, 240, 0.90); font: 12px/1 "Segoe UI", system-ui, sans-serif; padding: 0 6px; text-shadow: 0 0 10px rgba(0, 255, 240, 0.45); }',
       /* Right sidebar dock: frosted glass and a translucent code surface. */
       '[data-dsh-rightbar] { position: relative; isolation: isolate; background-color: rgba(0, 0, 0, 0.28) !important; --dsw-alias-markdown-code-block: rgba(0, 0, 0, 0.36) !important; }',
       '[data-dsh-rightbar]::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
@@ -392,21 +411,25 @@ const VV_OPTIONS = [
       '[class*="tabActive"] { text-shadow: 0 0 12px rgba(0, 255, 240, 0.45); }',
       '[class*="assistantVioletBright"] { color: #b98cff !important; background: rgba(150, 90, 255, 0.16) !important; }',
       /* Markdown code blocks: frosted glass with a cyan hairline. */
-      '[data-code-wrap] { background-color: rgba(0, 0, 0, 0.32) !important; backdrop-filter: blur(12px) saturate(1.05); -webkit-backdrop-filter: blur(12px) saturate(1.05); border: 1px solid rgba(0, 255, 240, 0.40) !important; }',
-      ':not(pre) > code { background: rgba(0, 0, 0, 0.30) !important; border-color: rgba(0, 255, 240, 0.40) !important; backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); }',
+      '[data-code-wrap] { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.40) !important; }',
+      ':not(pre) > code { background: rgba(0, 0, 0, 0.45) !important; border-color: rgba(0, 255, 240, 0.40) !important; }',
       /* Output file cards: frosted glass with a clearer cyan border. */
-      '[class*="_file"]:has([class*="cardPreview"]) { background-color: rgba(0, 0, 0, 0.30) !important; border-color: rgba(0, 255, 240, 0.45) !important; backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); }',
+      '[class*="_file"]:has([class*="cardPreview"]) { background-color: rgba(0, 0, 0, 0.45) !important; border-color: rgba(0, 255, 240, 0.45) !important; }',
       /* Changed-files / tool cards: frosted glass instead of a flat tint. */
-      '[class*="_card"]:has([class*="_header"]) { backdrop-filter: blur(12px) saturate(1.1); --changes-fill: rgba(0, 0, 0, 0.25) !important; --changes-hover: rgba(0, 255, 240, 0.16) !important; }',
+      '[class*="_card"]:has([class*="_header"]) { --changes-fill: rgba(0, 0, 0, 0.35) !important; --changes-hover: rgba(0, 255, 240, 0.16) !important; }',
       /* The settings sheet: opaque black panel with a theme outline. */
       '[class*="_panel"]:not([class*="panelBody"]):has([class*="navCell"]) { background-color: rgba(0, 0, 0, 0.55) !important; backdrop-filter: blur(20px) saturate(1.2); outline: 1px solid rgba(0, 255, 240, 0.55) !important; outline-offset: -1px !important; }',
       '[data-dsh-sidebar] { position: relative; isolation: isolate; z-index: 6; }',
       '[data-dsh-sidebar]::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
+      /* 顶部栏恢复毛玻璃：Windows 标题条 + 会话头。
+         标题条多盖 2px 且这 2px 不填底色，专门盖住两段毛玻璃之间的接缝。 */
+      'html[data-windows-titlebar] [class*="_frame"][class*="_frame"]::before { background: transparent !important; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
+      'header[data-window-drag] { background-color: transparent !important; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
       /* Workspace parent row: distinguishable fill and a left accent. */
       '[class*="_projectRow"] { background-color: rgba(0, 255, 240, 0.10) !important; box-shadow: inset 2px 0 0 rgba(0, 255, 240, 0.55); }',
       /* Session hover card: theme surface and readable text. */
-      ':is(div, section):has(> [class*="_hoverContent"]) { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); box-shadow: 0 0 18px rgba(0, 255, 240, 0.15) !important; }',
-      '[role="tooltip"]:has([class*="_hoverContent"]) { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); box-shadow: 0 0 18px rgba(0, 255, 240, 0.15) !important; }',
+      ':is(div, section):has(> [class*="_hoverContent"]) { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.15) !important; }',
+      '[role="tooltip"]:has([class*="_hoverContent"]) { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.15) !important; }',
       '[class*="_hoverTitle"] { color: #00fff0 !important; }',
       '[class*="_hoverPath"], [class*="_hoverTime"] { color: rgba(0, 255, 240, 0.75) !important; }',
       '[class*="_hoverStatus"] { color: rgba(0, 255, 240, 0.60) !important; }',
@@ -424,6 +447,8 @@ const VV_OPTIONS = [
       '  color: #000 !important;',
       '}',
       ':is(button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="treeitem"]):hover:not(:disabled):not([class*="brand"]) :where(*) { color: #000 !important; }',
+      /* 快捷键速查：整行覆盖层是实心青色按钮，行内文字、键帽、操作图标一起转黑 */
+      'li:has(> button:enabled:hover) :where(*) { color: #000 !important; }',
       /* Brand logo: keep the colors, add a translucent cyan highlight. */
       ':is(button, [role="button"])[class*="brand"]:hover { background-color: rgba(0, 255, 240, 0.14) !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.45), 0 0 18px rgba(0, 255, 240, 0.16) !important; }',
       /* Sidebar account chip: keep the solid highlight, add a large glow. */
@@ -436,7 +461,7 @@ const VV_OPTIONS = [
       ':is(button, [role="button"])[class*="_newSession"]:hover:not(:disabled) :where(*) { color: #000 !important; }',
       /* Todo dock above the composer: HUD glass; its header is a large composite
          button, so the global solid-cyan hover would flood the whole strip. */
-      '[data-testid="todo-panel"] { background: rgba(0, 0, 0, 0.45) !important; backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); border: 1px solid rgba(0, 255, 240, 0.35) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.10) !important; }',
+      '[data-testid="todo-panel"] { background: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.35) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.10) !important; }',
       '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"] { background: transparent !important; color: rgba(0, 255, 240, 0.86) !important; }',
       '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"]:hover:not(:disabled) { background: rgba(0, 255, 240, 0.10) !important; color: #00fff0 !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.28) !important; }',
       '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"]:hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
@@ -446,7 +471,7 @@ const VV_OPTIONS = [
       '[data-testid="todo-panel"] [class*="DXuOLW_glyph"] { color: rgba(0, 255, 240, 0.70) !important; }',
       /* User-question composer card and settled reply bubble: frosted glass
          with a cyan hairline instead of the flat tinted surface. */
-      '[data-question-key] > section { background: rgba(0, 0, 0, 0.50) !important; backdrop-filter: blur(16px) saturate(1.2); -webkit-backdrop-filter: blur(16px) saturate(1.2); border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 22px rgba(0, 255, 240, 0.14) !important; }',
+      '[data-question-key] > section { background: rgba(0, 0, 0, 0.50) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 22px rgba(0, 255, 240, 0.14) !important; }',
       '[data-question-key] > section > header { background: rgba(0, 255, 240, 0.06) !important; border-bottom: 1px solid rgba(0, 255, 240, 0.16) !important; }',
       '[data-question-key] [class*="wnLwla_eyebrow"] { color: rgba(0, 255, 240, 0.60) !important; letter-spacing: 0.16em; }',
       '[data-question-key] [class*="wnLwla_title"] { color: #00fff0 !important; }',
@@ -456,7 +481,7 @@ const VV_OPTIONS = [
       '[data-question-key] [data-option-row][class*="optionSelected"] { background: rgba(0, 255, 240, 0.12) !important; border-color: rgba(0, 255, 240, 0.55) !important; }',
       '[data-question-key] [data-option-row] :is([role="checkbox"], [role="radio"]):hover:not(:disabled) { background: transparent !important; color: inherit !important; box-shadow: none !important; }',
       '[data-question-key] [data-option-row] :is([role="checkbox"], [role="radio"]):hover:not(:disabled) :where(*) { color: inherit !important; }',
-      '[data-question-reply] > div > div[class] { box-sizing: border-box; background: rgba(0, 0, 0, 0.42) !important; backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); border: 1px solid rgba(0, 255, 240, 0.40) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.10) !important; color: rgba(0, 255, 240, 0.82) !important; }',
+      '[data-question-reply] > div > div[class] { box-sizing: border-box; background: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.40) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.10) !important; color: rgba(0, 255, 240, 0.82) !important; }',
       '[data-question-reply] > div > div[class] [class*="BfLV8a_header"] { color: rgba(0, 255, 240, 0.58) !important; letter-spacing: 0.12em; }',
       '[data-question-reply] > div > div[class] [class*="BfLV8a_question"] { color: rgba(0, 255, 240, 0.72) !important; }',
       '[data-question-reply] > div > div[class] [class*="BfLV8a_answer"] { color: #00fff0 !important; }',
@@ -469,7 +494,7 @@ const VV_OPTIONS = [
       '[data-conversation-tabs] button[role="tab"]:hover:not(:disabled) { background-color: transparent !important; color: #00fff0 !important; }',
       '[data-conversation-tabs] button[role="tab"]:hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
       /* Chat content rows (思考/ 编辑 …: soft framed frosted hover. */
-      '[data-slot="conversation.chat.flow"] :is(button, [role="button"]):hover:not(:disabled) { background-color: rgba(0, 0, 0, 0.32) !important; color: #00fff0 !important; backdrop-filter: blur(10px) saturate(1.1); -webkit-backdrop-filter: blur(10px) saturate(1.1); box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.70), 0 0 18px rgba(0, 255, 240, 0.30), inset 0 0 22px rgba(0, 255, 240, 0.10) !important; }',
+      '[data-slot="conversation.chat.flow"] :is(button, [role="button"]):hover:not(:disabled) { background-color: rgba(0, 0, 0, 0.45) !important; color: #00fff0 !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.70), 0 0 18px rgba(0, 255, 240, 0.30), inset 0 0 22px rgba(0, 255, 240, 0.10) !important; }',
       '[data-slot="conversation.chat.flow"] :is(button, [role="button"]):hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
       /* Edited-files card: header + file rows hover solid theme with a fade. */
       '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) { background-color: #00fff0 !important; color: #000 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; transition: background-color .18s ease !important; }',
@@ -478,7 +503,7 @@ const VV_OPTIONS = [
       '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) :where(*) { color: #000 !important; }',
       /* Delivered file cards: same tinted surface and solid-cyan hover as the
          changed-files card, so both boxes read as one family. */
-      '[data-presented-file] { background: rgba(0, 255, 240, 0.10) !important; border: .5px solid #00fff0 !important; backdrop-filter: blur(12px) saturate(1.1); -webkit-backdrop-filter: blur(12px) saturate(1.1); transition: background-color .18s ease, border-color .18s ease; }',
+      '[data-presented-file] { background: linear-gradient(rgba(0, 255, 240, 0.12), rgba(0, 255, 240, 0.12)), rgba(0, 0, 0, 0.45) !important; border: .5px solid #00fff0 !important; transition: background-color .18s ease, border-color .18s ease; }',
       '[data-presented-file]:hover { background: #00fff0 !important; border-color: #00fff0 !important; color: #000 !important; }',
       '[data-presented-file]:hover :where(*) { color: #000 !important; }',
       '[data-presented-file] [class*="cardPreview"]:hover:not(:disabled) { background: transparent !important; box-shadow: none !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }',
@@ -492,7 +517,7 @@ const VV_OPTIONS = [
       '[class*="_marks"] [class*="_mark"]:hover::before { background: #00fff0 !important; }',
       '[class*="_marks"] [class*="markActive"]::before { background: #00fff0 !important; box-shadow: 0 0 12px rgba(0, 255, 240, 0.65) !important; }',
       /* Turn preview popover: frosted glass, theme text. */
-      '[role="tooltip"][class*="preview"] { width: min(360px, 100cqw - 120px) !important; background: rgba(0, 0, 0, 0.55) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; backdrop-filter: blur(16px) saturate(1.15); -webkit-backdrop-filter: blur(16px) saturate(1.15); box-shadow: 0 0 18px rgba(0, 255, 240, 0.15), var(--dsw-elevation-panel) !important; }',
+      '[role="tooltip"][class*="preview"] { width: min(360px, 100cqw - 120px) !important; background: rgba(0, 0, 0, 0.55) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.15), var(--dsw-elevation-panel) !important; }',
       '[role="tooltip"][class*="preview"] [class*="previewPrompt"] { color: #00fff0 !important; font-weight: 700 !important; font-size: 15px !important; line-height: 1.45 !important; -webkit-line-clamp: 1 !important; }',
       '[role="tooltip"][class*="preview"] [class*="previewResponse"] { color: #00fff0 !important; font-size: 12px !important; line-height: 1.5 !important; margin-top: 3px !important; padding-top: 4px !important; border-top: 1px solid rgba(0, 255, 240, 0.28) !important; -webkit-line-clamp: 6 !important; }',
       /* Agent preset: solid "builtin" tag needs readable text. */
@@ -509,9 +534,11 @@ const VV_OPTIONS = [
       /* Tooltips keep their own light text even inside a hovered button. */
       '[class*="bubble"][data-portal], [class*="bubble"][data-portal] :where(*), [role="tooltip"], [role="tooltip"] :where(*) { color: rgba(255, 255, 255, 0.95) !important; }',
       /* HUD widgets: 7-segment balance card and edit-mode chrome. */
-      '.dsh-widget { position: fixed; z-index: 2; width: max-content; pointer-events: none; user-select: none; }',
-      '.dsh-widget.is-editing { pointer-events: auto; cursor: move; }',
-      '.dsh-widget-balance { box-sizing: border-box; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; background: rgba(0, 0, 0, 0.42); border: 2px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18), inset 0 0 24px rgba(0, 255, 240, 0.06); backdrop-filter: blur(10px); }',
+      '.dsh-widget { position: fixed; z-index: -1; width: max-content; pointer-events: none; user-select: none; }',
+      /* 非编辑态压在会话文本下面；编辑态浮上来（仍在设置等弹层之下），否则拖不动 */
+      '.dsh-widget.is-editing { z-index: 19; pointer-events: auto; cursor: move; }',
+      '.dsh-widget-scale { position: relative; display: block; }',
+      '.dsh-widget-balance { box-sizing: border-box; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; background: rgba(0, 0, 0, 0.58); border: 2px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18), inset 0 0 24px rgba(0, 255, 240, 0.06); }',
       '.dsh-widget-title { font-size: 13px; letter-spacing: 0.3em; color: rgba(0, 255, 240, 0.80); }',
       '.dsh-seven { display: flex; align-items: center; gap: 3px; }',
       '.dsh-seg { width: 22px; height: 36px; display: block; }',
@@ -536,15 +563,18 @@ const VV_OPTIONS = [
       '.dsh-widget-name { padding: 3px 12px; background: rgba(0, 0, 0, 0.88); color: #00fff0; font-size: 12px; letter-spacing: 0.25em; border: 1px solid rgba(0, 255, 240, 0.50); }',
       '.dsh-widget-close { position: absolute; top: 0; right: 0; z-index: 5; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 0, 0, 0.90); border: 1px solid rgba(0, 255, 240, 0.70); color: #00fff0 !important; font-size: 13px; line-height: 1; cursor: pointer; }',
       '.dsh-widget-close:hover { background: #00fff0 !important; color: #000 !important; }',
+      '.dsh-widget-reset { position: absolute; top: 0; left: 0; z-index: 6; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 0, 0, 0.90); border: 1px solid rgba(0, 255, 240, 0.70); color: #00fff0 !important; cursor: pointer; }',
+      '.dsh-widget-reset svg { display: block; width: 11px; height: 11px; }',
+      '.dsh-widget-reset:hover { background: #00fff0 !important; color: #000 !important; }',
       '@keyframes dsh-widget-list-in { from { opacity: 0; transform: translateY(8px) scaleY(0.88); } to { opacity: 1; transform: translateY(0) scaleY(1); } }',
-      '.dsh-widget-list { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 2; box-sizing: border-box; width: 138px; padding: 4px; display: flex; flex-direction: column; gap: 1px; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); backdrop-filter: blur(14px) saturate(1.1); -webkit-backdrop-filter: blur(14px) saturate(1.1); transform-origin: bottom right; animation: dsh-widget-list-in .18s ease-out; }',
+      '.dsh-widget-list { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 2; box-sizing: border-box; width: 138px; padding: 4px; display: flex; flex-direction: column; gap: 1px; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); transform-origin: bottom right; animation: dsh-widget-list-in .18s ease-out; }',
       '.dsh-widget-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; font-size: 11px; letter-spacing: 0.08em; color: rgba(0, 255, 240, 0.88) !important; cursor: pointer; user-select: none; }',
       '.dsh-widget-list-row:hover { background: rgba(0, 255, 240, 0.12); color: #00fff0 !important; }',
       '.dsh-widget-list-row[data-hidden] { color: rgba(0, 255, 240, 0.42) !important; }',
       '.dsh-widget-list-dot { flex: none; width: 9px; height: 9px; background: #00fff0; box-shadow: 0 0 8px rgba(0, 255, 240, 0.55); }',
       '.dsh-widget-list-row[data-hidden] .dsh-widget-list-dot { background: transparent; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.45); }',
       /* Chat "back to bottom" button: frosted HUD square instead of the floating pill. */
-      'button[class*="_toBottom"][class*="_toBottom"] { box-sizing: border-box; background: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.55) !important; color: #00fff0 !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.18) !important; backdrop-filter: blur(14px) saturate(1.15); -webkit-backdrop-filter: blur(14px) saturate(1.15); }',
+      'button[class*="_toBottom"][class*="_toBottom"] { box-sizing: border-box; background: rgba(0, 0, 0, 0.58) !important; border: 1px solid rgba(0, 255, 240, 0.55) !important; color: #00fff0 !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.18) !important; }',
       'button[class*="_toBottom"][class*="_toBottom"]:hover:not(:disabled) { background: rgba(0, 255, 240, 0.16) !important; border-color: #00fff0 !important; color: #00fff0 !important; box-shadow: 0 0 20px rgba(0, 255, 240, 0.30) !important; }',
       'button[class*="_toBottom"][class*="_toBottom"]:hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
       /* Right-edge tool stack: component edit + background editor, expanding leftwards. */
@@ -556,7 +586,7 @@ const VV_OPTIONS = [
       '.dsh-tool-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }',
       '.dsh-tool-hint { flex: none; white-space: nowrap; pointer-events: none; color: rgba(0, 255, 240, 0.38); font-size: 11px; letter-spacing: 0.06em; transition: opacity .18s ease; }',
       '.dsh-tool-row:hover .dsh-tool-hint, .dsh-tool-row:has(.dsh-tool[data-active]) .dsh-tool-hint { opacity: 0; }',
-      '.dsh-tool { width: 30px; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 7px; overflow: hidden; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(0, 255, 240, 0.60); color: #00fff0 !important; cursor: pointer; backdrop-filter: blur(8px); transition: width .18s ease, background-color .18s ease, filter .08s ease; }',
+      '.dsh-tool { width: 30px; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 7px; overflow: hidden; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(0, 255, 240, 0.60); color: #00fff0 !important; cursor: pointer; transition: width .18s ease, background-color .18s ease, filter .08s ease; }',
       '.dsh-tool svg { flex: none; width: 16px; height: 16px; }',
       '.dsh-tool:hover, .dsh-tool[data-active] { width: 138px; }',
       '.dsh-tool:active { filter: brightness(0.70); }',
@@ -601,6 +631,41 @@ const VV_OPTIONS = [
       '.dsh-bg-reset { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 20px; height: 18px; padding: 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.35); color: rgba(0, 255, 240, 0.80) !important; cursor: pointer; transition: background-color .12s ease, border-color .12s ease, opacity .12s ease; }',
       '.dsh-bg-reset[data-idle] { opacity: 0.35; }',
       '.dsh-bg-reset[data-idle]:hover { opacity: 1; }',
+      /* 剪贴板组件：三个可拖动的小方块 */
+      '.dsh-clip-slot { display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 6px; box-sizing: border-box; background: rgba(0, 0, 0, 0.55) !important; border: 1px solid rgba(0, 255, 240, 0.58); pointer-events: auto; will-change: transform; }',
+      '.dsh-clip-slot:hover { border-color: rgba(0, 255, 240, 0.78); box-shadow: 0 0 16px rgba(0, 255, 240, 0.18); }',
+      /* 有内容时不再给“+”留位置，正文吃满剩余高度 */
+      '.dsh-clip-slot[data-filled] .dsh-clip-body { flex: 1 1 auto; min-height: 0; max-height: none; }',
+      '.dsh-widget.is-editing.dsh-clip-slot { cursor: move; }',
+      /* 编辑模式与其它组件统一：空槽只显示条纹占位，有内容只换成编辑态边框 */
+      '.dsh-widget.is-editing.dsh-clip-slot[data-empty] { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }',
+      '.dsh-widget.is-editing.dsh-clip-slot[data-filled] { border: 2px solid #00fff0; box-shadow: 0 0 22px rgba(0, 255, 240, 0.45); }',
+      '.dsh-clip-head { flex: none; font-size: 10px; letter-spacing: 0.22em; color: rgba(0, 255, 240, 0.72); }',
+      '.dsh-widget.is-editing.dsh-clip-slot .dsh-clip-head { padding-left: 20px; }',
+      '.dsh-clip-body { flex: 0 1 auto; min-height: 22px; max-height: 46%; overflow: hidden; font-size: 12px; line-height: 1.4; color: rgba(0, 255, 240, 0.94); white-space: pre-wrap; word-break: break-word; cursor: pointer; }',
+      '.dsh-clip-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }',
+      '.dsh-clip-image { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }',
+      '.dsh-clip-file { display: flex; align-items: center; gap: 6px; min-width: 0; }',
+      '.dsh-clip-file-icon { flex: none; color: rgba(0, 255, 240, 0.82); }',
+      '.dsh-clip-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+      '.dsh-clip-plus { flex: 1 1 auto; min-height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 255, 240, 0.06); border: 1px dashed rgba(0, 255, 240, 0.45); color: rgba(0, 255, 240, 0.80) !important; font-size: 20px; line-height: 1; cursor: pointer; }',
+      '.dsh-clip-plus:hover { background: rgba(0, 255, 240, 0.16); border-color: rgba(0, 255, 240, 0.75); color: #00fff0 !important; }',
+      '.dsh-clip-bar { flex: none; display: flex; gap: 4px; }',
+      /* 三个按钮默认只显示图标，悬停才展开文字 */
+      '.dsh-clip-btn { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.42); color: rgba(0, 255, 240, 0.92) !important; font-size: 10px; line-height: 1; cursor: pointer; transition: background-color .14s ease, flex-grow .16s ease; }',
+      '.dsh-clip-btn svg { flex: none; display: block; width: 11px; height: 11px; }',
+      '.dsh-clip-btn-text { display: block; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .16s ease, opacity .14s ease; }',
+      '.dsh-clip-btn:hover { flex-grow: 2.4; background: rgba(0, 255, 240, 0.18); color: #00fff0 !important; }',
+      '.dsh-clip-btn:hover .dsh-clip-btn-text { max-width: 64px; opacity: 1; }',
+      /* 缩放把手：实心三角，比原来的渐变线条更醒目 */
+      '.dsh-clip-resize, .dsh-widget-resize { position: absolute; right: 0; bottom: 0; z-index: 3; width: 16px; height: 16px; cursor: nwse-resize; background: #00fff0; clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: 0.85; }',
+      '.dsh-clip-resize:hover, .dsh-widget-resize:hover { background: #ffffff; opacity: 1; }',
+      '.dsh-clip-hint { flex: 1 1 auto; min-height: 22px; display: flex; align-items: center; justify-content: center; padding: 0 4px; background: rgba(0, 255, 240, 0.12); border: 1px dashed rgba(0, 255, 240, 0.78); color: #00fff0 !important; font-size: 11px; letter-spacing: 0.06em; }',
+      '.dsh-clip-slot[data-armed] { border-color: #00fff0; box-shadow: 0 0 18px rgba(0, 255, 240, 0.35); }',
+      '.dsh-clip-notice { position: absolute; right: 6px; top: 6px; font-size: 10px; color: #00fff0; text-shadow: 0 0 8px rgba(0, 255, 240, 0.5); }',
+      '.dsh-clip-chip { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #000 !important; background: #00fff0; pointer-events: auto; cursor: pointer; box-shadow: 0 0 12px rgba(0, 255, 240, 0.45); }',
+      '.dsh-clip-chip:hover { background: #fff; }',
+      /* 剪贴板面板 */
       '.dsh-switch { box-sizing: border-box; position: relative; display: block; flex: 0 0 auto; width: 36px; height: 20px; padding: 2px; background: var(--dsw-alias-border-l3, rgba(0, 255, 240, 0.45)); cursor: pointer; }',
       '.dsh-switch[data-on] { background: var(--dsw-alias-brand-primary, #00fff0); }',
       '.dsh-switch-thumb { display: block; width: 16px; height: 16px; background: var(--dsw-alias-switch-thumb, #00fff0); transition: transform .12s ease, background-color .12s ease; }',
@@ -690,6 +755,404 @@ const VV_OPTIONS = [
      */
     let sharedResolveAccount = null;
 
+    /* ---- 剪贴板组件：三格存储 ------------------------------------------
+       写入由每格的“+”按钮手动触发：读系统剪贴板，按内容类型存成
+       文本 / 图片 / 文件（本地文件存 URI + 文件名）。 */
+    const CLIP3_KEY = 'dsh-exv-clip3.v1';
+    const CLIP_SIZE_KEY = 'dsh-exv-clip3-size.v1';
+    const CLIP_POS_VERSION_KEY = 'dsh-widget-clip-pos-v1';
+    const WIDGET_SCALE_KEY = 'dsh-exv-widget-scale.v1';
+    const WIDGET_SCALE_MIN = 0.55;
+    const WIDGET_SCALE_MAX = 1.8;
+    const CLIP_IDS = ['clip-1', 'clip-2', 'clip-3'];
+    const CLIP_MAX_TEXT = 20000;
+    const CLIP_MIN_W = 140;
+    const CLIP_MAX_W = 460;
+    const CLIP_MIN_H = 110;
+    const CLIP_MAX_H = 420;
+    const CLIP_DEFAULT_SIZE = { w: 184, h: 148 };
+
+    const readClipSlots = () => {
+      let raw = [];
+      try {
+        raw = JSON.parse(window.localStorage.getItem(CLIP3_KEY) || '[]');
+      } catch (error) {
+        raw = [];
+      }
+      return CLIP_IDS.map((id, index) => {
+        const item = Array.isArray(raw) && raw[index] && typeof raw[index] === 'object' ? raw[index] : {};
+        const text = typeof item.text === 'string' ? item.text.slice(0, CLIP_MAX_TEXT) : '';
+        const image = typeof item.image === 'string' ? item.image : '';
+        const kind = item.kind === 'image' ? 'image' : item.kind === 'file' ? 'file' : image ? 'image' : text ? 'text' : '';
+        return {
+          kind,
+          text,
+          image,
+          name: typeof item.name === 'string' ? item.name : '',
+          at: Number(item.at) || 0,
+          docked: item.docked === true,
+        };
+      });
+    };
+
+    const readClipSizes = () => {
+      let raw = {};
+      try {
+        raw = JSON.parse(window.localStorage.getItem(CLIP_SIZE_KEY) || '{}');
+      } catch (error) {
+        raw = {};
+      }
+      const sizes = {};
+      CLIP_IDS.forEach((id) => {
+        const item = raw && typeof raw === 'object' ? raw[id] : null;
+        const w = item && Number.isFinite(item.w) ? item.w : CLIP_DEFAULT_SIZE.w;
+        const h = item && Number.isFinite(item.h) ? item.h : CLIP_DEFAULT_SIZE.h;
+        sizes[id] = {
+          w: Math.round(Math.max(CLIP_MIN_W, Math.min(CLIP_MAX_W, w))),
+          h: Math.round(Math.max(CLIP_MIN_H, Math.min(CLIP_MAX_H, h))),
+        };
+      });
+      return sizes;
+    };
+
+    const writeClipSlots = (slots) => {
+      try {
+        window.localStorage.setItem(CLIP3_KEY, JSON.stringify(slots));
+      } catch (error) {
+        /* 容量满或隐私模式：静默失败 */
+      }
+      try {
+        window.dispatchEvent(new CustomEvent('dsh-exv-clipboard'));
+      } catch (error) {
+        /* ignore */
+      }
+      return slots;
+    };
+
+    const isEmptyClipSlot = (slot) => !slot.text && !slot.image;
+
+    /* 余额 / 状态 / 时钟的缩放系数（拖右下角把手调整） */
+    const readWidgetScales = () => {
+      let raw = {};
+      try {
+        raw = JSON.parse(window.localStorage.getItem(WIDGET_SCALE_KEY) || '{}');
+      } catch (error) {
+        raw = {};
+      }
+      const scales = {};
+      ['balance', 'status', 'clock'].forEach((id) => {
+        const value = raw && typeof raw === 'object' ? Number(raw[id]) : NaN;
+        scales[id] = Number.isFinite(value)
+          ? Math.min(WIDGET_SCALE_MAX, Math.max(WIDGET_SCALE_MIN, value))
+          : 1;
+      });
+      return scales;
+    };
+
+    /* 单行绝对路径 / file: URI 当作“文件”处理，其余按文本 */
+    const classifyClipText = (text) => {
+      const value = String(text || '');
+      const trimmed = value.trim();
+      if (trimmed && trimmed.indexOf('\n') < 0) {
+        if (/^[A-Za-z]:[\\/]/.test(trimmed)) {
+          return { payload: { kind: 'file', text: trimmed, image: '', name: trimmed.split(/[\\/]/).pop() || trimmed }, note: '已放入文件' };
+        }
+        if (/^file:\/{2,3}/i.test(trimmed)) {
+          const path = trimmed.replace(/^file:\/{2,3}/i, '');
+          return { payload: { kind: 'file', text: trimmed, image: '', name: decodeURIComponent(path).split(/[\\/]/).pop() || path }, note: '已放入文件' };
+        }
+      }
+      return { payload: { kind: 'text', text: value, image: '', name: '' }, note: '已放入文本' };
+    };
+
+    /* 把文本送进输入框，失败返回 false 交给调用方兜底 */
+    const insertIntoComposer = (text) => {
+      const composer = document.querySelector('[data-dsh-composer]');
+      const editor = (composer || document).querySelector('[contenteditable="true"], textarea');
+      if (!editor) return false;
+      try {
+        editor.focus();
+        if (editor.tagName === 'TEXTAREA') {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(editor, editor.value + (editor.value ? '\n' : '') + text);
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(false);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        return document.execCommand('insertText', false, text);
+      } catch (error) {
+        return false;
+      }
+    };
+
+    /* ---- 选中文字工具条 ------------------------------------------------
+       宿主自带的“引用文本”走 uiConversation.interactions，且面板只渲染第一个
+       抢到的注册项；内置插件注册更早，所以新动作抢不到。这里自建一条跟随选区
+       的工具条，内置那条用 CSS 隐藏，引用按钮靠程序化点击保持原有插入行为。 */
+    function SelectionToolbar() {
+      const [view, setView] = React.useState(null);
+      const [flash, setFlash] = React.useState('');
+      const [hover, setHover] = React.useState('');
+      const toastTimer = React.useRef(0);
+      const toolbarRef = React.useRef(null);
+      const computeRef = React.useRef(() => {});
+      const handlersRef = React.useRef({});
+      const pressedRef = React.useRef('');
+      const ignoreUntil = React.useRef(0);
+
+      const notify = (message) => {
+        setFlash(message);
+        window.clearTimeout(toastTimer.current);
+        toastTimer.current = window.setTimeout(() => setFlash(''), 1200);
+      };
+
+      React.useEffect(() => {
+        const insideChat = (node) => {
+          const el = node && (node.nodeType === 1 ? node : node.parentElement);
+          if (!el || !el.closest) return false;
+          if (el.closest('[data-dsh-composer]')) return false;
+          if (el.closest('input, textarea, [contenteditable="true"]')) return false;
+          return Boolean(el.closest('[data-slot="conversation.chat.flow"], [data-slot="conversation.chat"]'));
+        };
+
+        const hide = () => setView(null);
+
+        const compute = () => {
+          const selection = window.getSelection();
+          if (!selection || selection.isCollapsed || selection.rangeCount === 0) { hide(); return; }
+          const text = selection.toString();
+          if (!text.trim()) { hide(); return; }
+          if (!insideChat(selection.anchorNode) && !insideChat(selection.focusNode)) { hide(); return; }
+          const range = selection.getRangeAt(0);
+          const rects = Array.from(range.getClientRects()).filter((rect) => rect.width > 0 && rect.height > 0);
+          const rect = rects.length > 0 ? rects[0] : range.getBoundingClientRect();
+          if (!rect || (rect.width === 0 && rect.height === 0)) { hide(); return; }
+          const above = rect.top > 60;
+          setView({
+            text,
+            left: Math.min(Math.max(rect.left + rect.width / 2, 150), window.innerWidth - 150),
+            top: above ? rect.top - 10 : rect.bottom + 10,
+            above,
+          });
+        };
+        computeRef.current = compute;
+
+        const onPointerUp = (event) => {
+          /* 右键的位置由 contextmenu 决定，这里再算一次会让菜单跳一下 */
+          if (event.button !== 0) return;
+          if (toolbarRef.current && toolbarRef.current.contains(event.target)) return;
+          if (performance.now() < ignoreUntil.current) return;
+          window.setTimeout(compute, 0);
+        };
+        const onKeyUp = (event) => {
+          if (event.key === 'Escape') { hide(); return; }
+          window.setTimeout(compute, 0);
+        };
+        const onSelectionChange = () => {
+          const selection = window.getSelection();
+          if (!selection || selection.isCollapsed || !selection.toString().trim()) hide();
+        };
+
+        /* 右键：有对话区选区时，用我们的工具条替代宿主那个只有“复制”的菜单 */
+        const onContextMenu = (event) => {
+          const selection = window.getSelection();
+          if (!selection || selection.isCollapsed) return;
+          const text = selection.toString();
+          if (!text.trim()) return;
+          if (!insideChat(selection.anchorNode) && !insideChat(selection.focusNode)) return;
+          const bar = toolbarRef.current;
+          if (bar && bar.contains(event.target)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          ignoreUntil.current = performance.now() + 400;
+          const above = event.clientY > 60;
+          setView({
+            text,
+            left: Math.min(Math.max(event.clientX, 150), window.innerWidth - 150),
+            top: above ? event.clientY - 10 : event.clientY + 18,
+            above,
+          });
+        };
+
+        document.addEventListener('pointerup', onPointerUp, true);
+        document.addEventListener('keyup', onKeyUp, true);
+        document.addEventListener('selectionchange', onSelectionChange);
+        document.addEventListener('contextmenu', onContextMenu, true);
+        document.addEventListener('scroll', hide, true);
+        return () => {
+          document.removeEventListener('pointerup', onPointerUp, true);
+          document.removeEventListener('keyup', onKeyUp, true);
+          document.removeEventListener('selectionchange', onSelectionChange);
+          document.removeEventListener('contextmenu', onContextMenu, true);
+          document.removeEventListener('scroll', hide, true);
+          window.clearTimeout(toastTimer.current);
+        };
+      }, []);
+
+      /* 工具条自己处理指针事件，并在 window 捕获阶段截断：
+         宿主的 document 级 pointerdown 会先销毁内置引用浮层，等 click 到达时
+         原生引用按钮已经不在 DOM 里了。挡住它，原生引用节点才拿得到。 */
+      React.useEffect(() => {
+        const pick = (event) => {
+          const target = event.target instanceof Element ? event.target : null;
+          return target ? target.closest('button[data-action]') : null;
+        };
+        const onDown = (event) => {
+          const bar = toolbarRef.current;
+          if (!bar || !bar.contains(event.target)) return;
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          const button = pick(event);
+          pressedRef.current = button ? button.dataset.action : '';
+        };
+        const onUp = (event) => {
+          const bar = toolbarRef.current;
+          if (!bar || !bar.contains(event.target)) return;
+          event.stopImmediatePropagation();
+          event.preventDefault();
+          const button = pick(event);
+          const action = button ? button.dataset.action : '';
+          if (action && action === pressedRef.current) {
+            const handler = handlersRef.current[action];
+            if (handler) handler();
+          }
+          pressedRef.current = '';
+        };
+        window.addEventListener('pointerdown', onDown, true);
+        window.addEventListener('pointerup', onUp, true);
+        return () => {
+          window.removeEventListener('pointerdown', onDown, true);
+          window.removeEventListener('pointerup', onUp, true);
+        };
+      }, []);
+
+      /* 滑块跟随悬停按钮（必须在提前返回之前，保持 hook 顺序稳定） */
+      React.useEffect(() => {
+        const bar = toolbarRef.current;
+        if (!bar || !hover) return;
+        const button = bar.querySelector(`button[data-action="${hover}"]`);
+        const thumb = bar.querySelector('[data-dsh-sel-thumb]');
+        if (!button || !thumb) return;
+        thumb.style.width = `${button.offsetWidth}px`;
+        thumb.style.transform = `translateX(${button.offsetLeft - 4}px)`;
+      }, [hover]);
+
+      /* 新的选区出现时重置悬停，避免滑块带着旧位置出现 */
+      React.useEffect(() => { setHover(''); }, [view]);
+
+      if (!view) return null;
+
+      const close = () => setView(null);
+
+      const copy = () => {
+        const text = view.text;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(text).then(() => notify('已复制'), () => notify('复制失败'));
+        } else {
+          notify('复制不可用');
+        }
+      };
+
+      /* 内置引用按钮只负责把文本转成引用节点，点它即可保持原行为。 */
+      const quote = () => {
+        const button = document.querySelector('[data-text-interaction-surface] button');
+        if (!button) {
+          /* 兜底：以 Markdown 引用行插入，发送后仍会渲染成引用块。 */
+          insertPrompt(`${quotedText()}\n\n`);
+          return;
+        }
+        button.click();
+        close();
+      };
+
+      const insertPrompt = (prompt) => {
+        if (insertIntoComposer(prompt)) { close(); return; }
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(prompt).then(() => notify('已复制，Ctrl+V 插入'), () => notify('插入失败'));
+        } else {
+          notify('插入失败');
+        }
+      };
+
+      const quotedText = () => view.text.split('\n').map((line) => `> ${line}`).join('\n');
+
+      /* 对话区的文字是只读的，粘贴的落点只能是输入框。 */
+      const paste = () => {
+        if (!navigator.clipboard || !navigator.clipboard.readText) { notify('粘贴不可用'); return; }
+        navigator.clipboard.readText().then((text) => {
+          if (!text) { notify('剪贴板为空'); return; }
+          insertPrompt(text);
+        }, () => notify('无法读取剪贴板'));
+      };
+
+      const selectAll = () => {
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) return;
+        const node = selection.anchorNode;
+        const el = node && (node.nodeType === 1 ? node : node.parentElement);
+        if (!el) return;
+        const block = el.closest('p, li, pre, blockquote, h1, h2, h3, h4, h5, h6, td, th') || el;
+        const range = document.createRange();
+        range.selectNodeContents(block);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        window.setTimeout(() => computeRef.current(), 0);
+      };
+
+      handlersRef.current = { copy, quote, paste, selectAll };
+
+      const actionButton = (label, action) => h('button', {
+        type: 'button',
+        'data-action': action,
+      }, label);
+
+      return h('div', {
+        ref: toolbarRef,
+        'data-dsh-selection-toolbar': '',
+        'data-hover': hover || undefined,
+        style: {
+          left: `${view.left}px`,
+          top: `${view.top}px`,
+          transform: view.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)',
+        },
+        onPointerMove: (event) => {
+          const target = event.target instanceof Element ? event.target.closest('button[data-action]') : null;
+          setHover(target ? target.dataset.action : '');
+        },
+        onPointerLeave: () => setHover(''),
+      },
+        h('div', { 'data-dsh-sel-thumb': '' }),
+        actionButton('复制', 'copy'),
+        actionButton('引用', 'quote'),
+        actionButton('粘贴', 'paste'),
+        actionButton('全选', 'selectAll'),
+        flash ? h('span', { 'data-flash': '' }, flash) : null,
+      );
+    }
+
+    class SelectionBoundary extends React.Component {
+      constructor(props) {
+        super(props);
+        this.state = { failed: false };
+      }
+
+      static getDerivedStateFromError() {
+        return { failed: true };
+      }
+
+      render() {
+        if (this.state.failed) return null;
+        return h(SelectionToolbar);
+      }
+    }
+
     class WidgetBoundary extends React.Component {
       constructor(props) {
         super(props);
@@ -698,6 +1161,21 @@ const VV_OPTIONS = [
 
       static getDerivedStateFromError(error) {
         return { error: String((error && error.message) || error) };
+      }
+
+      componentDidCatch(error, info) {
+        /* 把现场写进 localStorage：即使不开 DevTools 也能事后查 */
+        try {
+          window.localStorage.setItem('dsh-exv-last-error', JSON.stringify({
+            message: String((error && error.message) || error),
+            stack: String((error && error.stack) || ''),
+            componentStack: String((info && info.componentStack) || ''),
+            at: new Date().toISOString(),
+          }));
+          console.error('[dsh-exv] widget render failed', error, info && info.componentStack);
+        } catch (ignored) {
+          /* ignore */
+        }
       }
 
       render() {
@@ -1100,6 +1578,9 @@ const VV_OPTIONS = [
       { id: 'balance', label: '余额', storageKey: 'dsh-widget-balance-ratio', defaultRatio: { rx: 0.14, ry: 0.16 } },
       { id: 'status', label: '峰谷状态', storageKey: 'dsh-widget-status-ratio', defaultRatio: { rx: 0.14, ry: 0.30 } },
       { id: 'clock', label: '时钟', storageKey: 'dsh-widget-clock-ratio', defaultRatio: { rx: 0.14, ry: 0.44 } },
+      { id: 'clip-1', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-1-ratio', defaultRatio: { rx: 0.885, ry: 0.58 } },
+      { id: 'clip-2', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-2-ratio', defaultRatio: { rx: 0.885, ry: 0.68 } },
+      { id: 'clip-3', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-3-ratio', defaultRatio: { rx: 0.885, ry: 0.78 } },
     ];
     const WIDGET_HIDDEN_KEY = 'dsh-widget-hidden';
     /* 高峰：北京时间工作日 09:00–12:00、14:00–18:00；其余为空闲（半价）。
@@ -1211,6 +1692,17 @@ const VV_OPTIONS = [
       const [viewport, setViewport] = React.useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
       const [positions, setPositions] = React.useState(() => {
         const result = {};
+        /* 一次性把剪贴板方块挪到其它组件旁边，覆盖早期存下的位置 */
+        try {
+          if (window.localStorage.getItem(CLIP_POS_VERSION_KEY) !== '1') {
+            WIDGET_REGISTRY.filter((entry) => entry.group === 'clipboard').forEach((entry) => {
+              window.localStorage.setItem(entry.storageKey, JSON.stringify(entry.defaultRatio));
+            });
+            window.localStorage.setItem(CLIP_POS_VERSION_KEY, '1');
+          }
+        } catch (error) {
+          /* ignore */
+        }
         WIDGET_REGISTRY.forEach((item) => {
           try {
             const saved = JSON.parse(window.localStorage.getItem(item.storageKey) || 'null');
@@ -1242,10 +1734,20 @@ const VV_OPTIONS = [
       const [balanceError, setBalanceError] = React.useState(null);
       const [hiddenWidgets, setHiddenWidgets] = React.useState(() => {
         try {
-          const raw = JSON.parse(window.localStorage.getItem(WIDGET_HIDDEN_KEY) || '[]');
-          return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
+          const stored = window.localStorage.getItem(WIDGET_HIDDEN_KEY);
+          const raw = JSON.parse(stored || '[]');
+          const list = Array.isArray(raw) ? raw.filter((id) => typeof id === 'string') : [];
+          /* 剪贴板组件第一次出现时默认关闭，避免莫名的三个空方块 */
+          const seen = window.localStorage.getItem('dsh-widget-clip-seen');
+          const hasContent = readClipSlots().some((slot) => slot.text || slot.image);
+          const touchesClip = CLIP_IDS.some((id) => list.indexOf(id) >= 0);
+          if (seen !== '1' && !hasContent && !touchesClip) {
+            try { window.localStorage.setItem('dsh-widget-clip-seen', '1'); } catch (error) { /* ignore */ }
+            return [...list, ...CLIP_IDS];
+          }
+          return list;
         } catch (error) {
-          return [];
+          return [...CLIP_IDS];
         }
       });
       React.useEffect(() => {
@@ -1261,6 +1763,293 @@ const VV_OPTIONS = [
           return previous.filter((item) => item !== id);
         });
       };
+
+      /* ---- 剪贴板组件状态 ---------------------------------------------- */
+      const [clipSlots, setClipSlots] = React.useState(() => readClipSlots());
+      const [clipSizes, setClipSizes] = React.useState(() => readClipSizes());
+      const [widgetScales, setWidgetScales] = React.useState(() => readWidgetScales());
+      const [clipNotice, setClipNotice] = React.useState({ index: -1, text: '' });
+      const [clipArmed, setClipArmed] = React.useState(-1);
+      const clipNoticeTimer = React.useRef(0);
+      const clipArmTimer = React.useRef(0);
+      const clipActionsRef = React.useRef({});
+      const clipSizesRef = React.useRef(clipSizes);
+      clipSizesRef.current = clipSizes;
+      const widgetScalesRef = React.useRef(widgetScales);
+      widgetScalesRef.current = widgetScales;
+
+      React.useEffect(() => {
+        const refresh = () => setClipSlots(readClipSlots());
+        window.addEventListener('dsh-exv-clipboard', refresh);
+        return () => {
+          window.removeEventListener('dsh-exv-clipboard', refresh);
+          window.clearTimeout(clipNoticeTimer.current);
+          window.clearTimeout(clipArmTimer.current);
+        };
+      }, []);
+
+      const notifyClip = (index, text, milliseconds) => {
+        setClipNotice({ index, text });
+        window.clearTimeout(clipNoticeTimer.current);
+        clipNoticeTimer.current = window.setTimeout(
+          () => setClipNotice({ index: -1, text: '' }),
+          Number.isFinite(milliseconds) ? milliseconds : 1200,
+        );
+      };
+
+      const writeSlots = (slots) => setClipSlots(writeClipSlots(slots));
+
+      /* 把内容写进指定的一格（覆盖原有内容） */
+      const setSlot = (index, payload) => {
+        const slots = readClipSlots();
+        slots[index] = {
+          ...slots[index],
+          ...payload,
+          at: Date.now(),
+          docked: false,
+        };
+        writeSlots(slots);
+      };
+
+      /* 读系统剪贴板：文件优先（uri-list），其次图片，最后纯文本。
+         Electron 里 clipboard.read() 可能被权限挡住，读不到时转为
+         “按 Ctrl+V 放入”，由 paste 事件兜底——资源管理器复制的图片/文件走这条路最稳。 */
+      const storePastedFile = (index, file) => {
+        if (!file) return;
+        const isImage = typeof file.type === 'string' && file.type.indexOf('image/') === 0;
+        if (isImage) {
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (typeof reader.result === 'string') {
+              setSlot(index, { kind: 'image', text: '', image: reader.result, name: file.name || '' });
+              notifyClip(index, file.name ? '已放入图片 ' + file.name : '已放入图片');
+            }
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+        const path = typeof file.path === 'string' && file.path ? file.path : '';
+        setSlot(index, { kind: 'file', text: path || file.name, image: '', name: file.name || path });
+        notifyClip(index, '已放入文件');
+      };
+
+      const armClipPaste = (index) => {
+        setClipArmed(index);
+        window.clearTimeout(clipArmTimer.current);
+        clipArmTimer.current = window.setTimeout(() => setClipArmed(-1), 12000);
+        notifyClip(index, '按 Ctrl+V 放入', 4000);
+      };
+
+      const disarmClipPaste = () => {
+        window.clearTimeout(clipArmTimer.current);
+        setClipArmed(-1);
+      };
+
+      React.useEffect(() => {
+        if (clipArmed < 0) return undefined;
+        const index = clipArmed;
+        const onPaste = (event) => {
+          const data = event.clipboardData;
+          if (!data) return;
+          const files = data.files ? Array.from(data.files) : [];
+          const uri = data.getData('text/uri-list');
+          const text = data.getData('text/plain');
+          if (files.length === 0 && !uri && !text) return;
+          event.preventDefault();
+          event.stopPropagation();
+          disarmClipPaste();
+          if (files.length > 0) {
+            storePastedFile(index, files[0]);
+            return;
+          }
+          if (uri) {
+            const first = uri.split(/\r?\n/).map((line) => line.trim()).find((line) => line && line.charAt(0) !== '#');
+            if (first) {
+              const decoded = decodeURIComponent(first.replace(/^file:\/{2,3}/i, '').replace(/^file:/i, ''));
+              const name = decoded.split(/[\\/]/).pop() || decoded;
+              setSlot(index, { kind: 'file', text: first, image: '', name });
+              notifyClip(index, '已放入文件');
+              return;
+            }
+          }
+          if (text && text.trim()) {
+            const result = classifyClipText(text);
+            setSlot(index, result.payload);
+            notifyClip(index, result.note);
+            return;
+          }
+          armClipPaste(index);
+        };
+        document.addEventListener('paste', onPaste, true);
+        return () => document.removeEventListener('paste', onPaste, true);
+      }, [clipArmed]);
+
+      const readClipboardInto = (index) => {
+        if (!navigator.clipboard) { armClipPaste(index); return; }
+        const readText = () => {
+          if (!navigator.clipboard.readText) { armClipPaste(index); return; }
+          navigator.clipboard.readText().then((text) => {
+            if (!text || !text.trim()) { armClipPaste(index); return; }
+            const result = classifyClipText(text);
+            setSlot(index, result.payload);
+            notifyClip(index, result.note);
+          }, () => armClipPaste(index));
+        };
+        if (!navigator.clipboard.read) { readText(); return; }
+        navigator.clipboard.read().then((items) => {
+          const next = (list) => {
+            if (list.length === 0) { readText(); return; }
+            const item = list.shift();
+            const types = Array.from(item.types || []);
+            const uriType = types.find((type) => type === 'text/uri-list');
+            if (uriType) {
+              item.getType(uriType).then((blob) => blob.text()).then((uriText) => {
+                const uri = uriText.split(/\r?\n/).map((line) => line.trim()).find((line) => line && line.charAt(0) !== '#');
+                if (!uri) { next(list); return; }
+                let name = decodeURIComponent(uri.replace(/^file:\/{2,3}/i, '').replace(/^file:/i, ''));
+                name = name.split(/[\\/]/).pop() || name;
+                setSlot(index, { kind: 'file', text: uri, image: '', name });
+                notifyClip(index, '已放入文件');
+              }).catch(() => next(list));
+              return;
+            }
+            const imageType = types.find((type) => type.indexOf('image/') === 0);
+            if (imageType) {
+              item.getType(imageType).then((blob) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                  if (typeof reader.result === 'string') {
+                    setSlot(index, { kind: 'image', text: '', image: reader.result, name: '' });
+                    notifyClip(index, '已放入图片');
+                  }
+                };
+                reader.readAsDataURL(blob);
+              }).catch(() => next(list));
+              return;
+            }
+            const textType = types.find((type) => type === 'text/plain');
+            if (textType) {
+              item.getType(textType).then((blob) => blob.text()).then((text) => {
+                if (!text || !text.trim()) { next(list); return; }
+                const result = classifyClipText(text);
+                setSlot(index, result.payload);
+                notifyClip(index, result.note);
+              }).catch(() => next(list));
+              return;
+            }
+            next(list);
+          };
+          next(Array.from(items || []));
+        }, readText);
+      };
+
+      const undockAllClips = () => writeSlots(readClipSlots().map((slot) => ({ ...slot, docked: false })));
+
+      const clearClip = (index) => {
+        const slots = readClipSlots();
+        slots[index] = { ...slots[index], kind: '', text: '', image: '', name: '', at: 0 };
+        writeSlots(slots);
+        notifyClip(index, '已清空');
+      };
+
+      const sendClip = (index) => {
+        const slot = readClipSlots()[index];
+        if (!slot || (!slot.text && !slot.image)) return;
+        if (!slot.image) {
+          /* 文件插原始路径，比 file:// URI 更可读 */
+          const text = slot.kind === 'file'
+            ? decodeURIComponent(slot.text.replace(/^file:\/{2,3}/i, ''))
+            : slot.text;
+          if (insertIntoComposer(text)) notifyClip(index, '已发送');
+          else notifyClip(index, '发送失败');
+          return;
+        }
+        /* 图片：写回系统剪贴板，用户自己 Ctrl+V */
+        if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+          fetch(slot.image)
+            .then((response) => response.blob())
+            .then((blob) => navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]))
+            .then(() => notifyClip(index, '图片已复制'), () => notifyClip(index, '复制失败'));
+        } else {
+          notifyClip(index, '不支持图片');
+        }
+      };
+
+      const dockClip = (index) => {
+        const slots = readClipSlots();
+        slots[index] = { ...slots[index], docked: true };
+        const next = writeClipSlots(slots);
+        setClipSlots(next);
+        /* 三个都最小化 → 关闭整个组件 */
+        if (next.every((slot) => slot.docked)) {
+          CLIP_IDS.forEach((id) => setWidgetHidden(id, true));
+        }
+      };
+
+      const restoreClip = (index) => {
+        const slots = readClipSlots();
+        slots[index] = { ...slots[index], docked: false };
+        writeSlots(slots);
+      };
+
+      /* 恢复默认大小：剪贴板回到 184x148，其它组件回到 1.0 倍 */
+      const resetWidgetSize = (id) => {
+        if (CLIP_IDS.indexOf(id) >= 0) {
+          const next = { ...clipSizesRef.current, [id]: { w: CLIP_DEFAULT_SIZE.w, h: CLIP_DEFAULT_SIZE.h } };
+          setClipSizes(next);
+          try {
+            window.localStorage.setItem(CLIP_SIZE_KEY, JSON.stringify(next));
+          } catch (error) {
+            /* ignore persistence errors */
+          }
+          notifyClip(CLIP_IDS.indexOf(id), '已恢复默认大小');
+          return;
+        }
+        const next = { ...widgetScalesRef.current, [id]: 1 };
+        setWidgetScales(next);
+        try {
+          window.localStorage.setItem(WIDGET_SCALE_KEY, JSON.stringify(next));
+        } catch (error) {
+          /* ignore persistence errors */
+        }
+      };
+
+      clipActionsRef.current = { clear: clearClip, send: sendClip, dock: dockClip, restore: restoreClip, read: readClipboardInto };
+
+      /* 组件在 portal 里，React 合成事件收不到，按钮全部走原生委派 */
+      React.useEffect(() => {
+        const onClick = (event) => {
+          const target = event.target;
+          if (!target || typeof target.closest !== 'function') return;
+          const restore = target.closest('[data-clip-restore]');
+          if (restore) {
+            event.preventDefault();
+            event.stopPropagation();
+            clipActionsRef.current.restore(Number(restore.getAttribute('data-clip-restore')));
+            return;
+          }
+          const button = target.closest('[data-clip-action]');
+          if (button) {
+            event.preventDefault();
+            event.stopPropagation();
+            const handler = clipActionsRef.current[button.getAttribute('data-clip-action')];
+            if (handler) handler(Number(button.getAttribute('data-clip-index')));
+            return;
+          }
+          const copyArea = target.closest('[data-clip-copy]');
+          if (copyArea) {
+            /* 编辑模式下点击/拖动不触发复制 */
+            if (copyArea.closest('.is-editing')) return;
+            const index = Number(copyArea.getAttribute('data-clip-copy'));
+            const slot = readClipSlots()[index];
+            if (slot && slot.text && navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(slot.text).then(() => notifyClip(index, '已复制'), () => notifyClip(index, '复制失败'));
+            }
+          }
+        };
+        document.addEventListener('click', onClick, true);
+        return () => document.removeEventListener('click', onClick, true);
+      }, []);
       const [composerBox, setComposerBox] = React.useState(null);
       const [floatHost, setFloatHost] = React.useState(null);
       React.useEffect(() => {
@@ -1314,14 +2103,29 @@ const VV_OPTIONS = [
 
       React.useEffect(() => {
         let frame = 0;
-        const apply = () => {
-          const motion = window.__dshWidgetMotion;
-          if (motion) {
-            document.querySelectorAll('.dsh-widget').forEach((el) => {
-              el.style.transform = `translate3d(${motion.x.toFixed(2)}px, ${motion.y.toFixed(2)}px, 0)`;
-            });
-          }
+        let lastAt = 0;
+        let lastX = Number.POSITIVE_INFINITY;
+        let lastY = Number.POSITIVE_INFINITY;
+        let collectedAt = 0;
+        let nodes = [];
+        const collect = () => {
+          nodes = Array.from(document.querySelectorAll('.dsh-widget'));
+          collectedAt = performance.now();
+        };
+        const apply = (now) => {
           frame = window.requestAnimationFrame(apply);
+          const motion = window.__dshWidgetMotion;
+          if (!motion) return;
+          const moved = Math.abs(motion.x - lastX) + Math.abs(motion.y - lastY);
+          /* 微动效是慢速漂移：30fps 足够；位移极小时连样式都不写，
+             避免每帧给所有组件重设 transform（会反复触发重绘/合成）。 */
+          if (now - lastAt < 32 && moved < 0.4) return;
+          if (now - collectedAt > 1500) collect();
+          lastAt = now;
+          lastX = motion.x;
+          lastY = motion.y;
+          const transform = `translate3d(${motion.x.toFixed(2)}px, ${motion.y.toFixed(2)}px, 0)`;
+          for (const el of nodes) el.style.transform = transform;
         };
         frame = window.requestAnimationFrame(apply);
         return () => window.cancelAnimationFrame(frame);
@@ -1450,17 +2254,35 @@ const VV_OPTIONS = [
         };
 
         const run = () => {
+          const started = performance.now();
           placeDivider();
           placeRightbar();
           placeComposer();
           placeTrajectory();
+          const timing = window.__dshExvTiming;
+          if (timing && timing.scan) {
+            timing.scan.push(performance.now() - started);
+            if (timing.scan.length > 200) timing.scan.shift();
+          }
         };
+        let idlePending = false;
         const schedule = () => {
-          if (timer) return;
+          if (timer || idlePending) return;
           timer = window.setTimeout(() => {
             timer = 0;
-            run();
-          }, 120);
+            const call = () => {
+              idlePending = false;
+              run();
+            };
+            /* 会话流式输出时 DOM 每帧都在变；把这几处“量尺寸”放到空闲时段，
+               避免和 React 的渲染抢主线程（否则每 120ms 强制一次同步布局）。 */
+            if (typeof window.requestIdleCallback === 'function') {
+              idlePending = true;
+              window.requestIdleCallback(call, { timeout: 800 });
+            } else {
+              call();
+            }
+          }, 250);
         };
 
         run();
@@ -1475,7 +2297,7 @@ const VV_OPTIONS = [
           resizeObserver = new ResizeObserver(() => schedule());
         }
         observeComposer(composerCard);
-        const interval = window.setInterval(schedule, 1500);
+        const interval = window.setInterval(schedule, 2500);
         return () => {
           observer.disconnect();
           window.removeEventListener('resize', onResize);
@@ -1539,19 +2361,41 @@ const VV_OPTIONS = [
           });
         };
         load();
-        const timer = window.setInterval(load, 20000);
+        /* 一轮对话结束后立刻补拉一次；窗口重新可见 / 聚焦时也补一次。
+           平台的扣费结算是异步的，客户端能做的只是把“发现延迟”压到最小。 */
+        const timer = window.setInterval(load, 10000);
+        const onRefresh = () => load();
+        const onVisible = () => {
+          if (!document.hidden) load();
+        };
+        window.addEventListener('dsh-exv-refresh-balance', onRefresh);
+        window.addEventListener('focus', onVisible);
+        document.addEventListener('visibilitychange', onVisible);
         return () => {
           alive = false;
           window.clearInterval(timer);
+          window.removeEventListener('dsh-exv-refresh-balance', onRefresh);
+          window.removeEventListener('focus', onVisible);
+          document.removeEventListener('visibilitychange', onVisible);
         };
       }, []);
 
       React.useEffect(() => {
         if (!editing) return undefined;
         let drag = null;
+        let resize = null;
+        let frame = 0;
+        let pending = null;
+        let resizeFrame = 0;
+        let pendingSize = null;
+        let scaleDrag = null;
+        let scaleFrame = 0;
+        let pendingScale = null;
+
         const onUp = () => {
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
+          if (frame) { window.cancelAnimationFrame(frame); frame = 0; pending = null; }
           drag = null;
           const current = positionsRef.current;
           WIDGET_REGISTRY.forEach((item) => {
@@ -1567,29 +2411,128 @@ const VV_OPTIONS = [
           const target = event.target;
           if (!target || typeof target.closest !== 'function') return;
           const widget = target.closest('.dsh-widget');
-          if (!widget || target.closest('.dsh-widget-close')) return;
+          if (!widget) return;
           const id = widget.getAttribute('data-widget-id');
           if (!id) return;
+          /* 右下角把手：调整余额 / 状态 / 时钟的整体缩放 */
+          if (target.closest('[data-widget-resize]')) {
+            event.preventDefault();
+            const rect = widget.getBoundingClientRect();
+            scaleDrag = {
+              id,
+              px: event.clientX,
+              py: event.clientY,
+              w: Math.max(1, rect.width),
+              h: Math.max(1, rect.height),
+              scale: widgetScalesRef.current[id] || 1,
+            };
+            window.addEventListener('pointermove', onScaleMove);
+            window.addEventListener('pointerup', onScaleUp);
+            return;
+          }
+          /* 右下角把手：调整剪贴板方块大小 */
+          if (target.closest('[data-clip-resize]')) {
+            event.preventDefault();
+            const rect = widget.getBoundingClientRect();
+            resize = { id, px: event.clientX, py: event.clientY, w: rect.width, h: rect.height };
+            window.addEventListener('pointermove', onResizeMove);
+            window.addEventListener('pointerup', onResizeUp);
+            return;
+          }
+          if (target.closest('.dsh-widget-close') || target.closest('.dsh-widget-reset')
+            || target.closest('.dsh-clip-bar')
+            || target.closest('.dsh-clip-plus') || target.closest('[data-clip-restore]')) return;
           event.preventDefault();
           const rect = widget.getBoundingClientRect();
           drag = { id, px: event.clientX, py: event.clientY, x: rect.left, y: rect.top, w: rect.width, h: rect.height };
           window.addEventListener('pointermove', onMove);
           window.addEventListener('pointerup', onUp);
         };
+        /* 拖动按帧合并：pointermove 可能一帧来很多次，逐次 setState 会明显卡顿 */
         const onMove = (event) => {
           if (drag === null) return;
+          const id = drag.id;
           const x = Math.max(0, Math.min(viewport.w - drag.w, drag.x + event.clientX - drag.px));
           const y = Math.max(0, Math.min(viewport.h - drag.h, drag.y + event.clientY - drag.py));
-          setPositions((previous) => ({
-            ...previous,
-            [drag.id]: { rx: x / Math.max(1, viewport.w), ry: y / Math.max(1, viewport.h) },
-          }));
+          pending = { id, x, y };
+          if (frame) return;
+          frame = window.requestAnimationFrame(() => {
+            frame = 0;
+            const next = pending;
+            pending = null;
+            if (!next) return;
+            setPositions((previous) => ({
+              ...previous,
+              [next.id]: { rx: next.x / Math.max(1, viewport.w), ry: next.y / Math.max(1, viewport.h) },
+            }));
+          });
+        };
+        const onResizeMove = (event) => {
+          if (resize === null) return;
+          const id = resize.id;
+          const w = Math.max(CLIP_MIN_W, Math.min(CLIP_MAX_W, resize.w + event.clientX - resize.px));
+          const h = Math.max(CLIP_MIN_H, Math.min(CLIP_MAX_H, resize.h + event.clientY - resize.py));
+          pendingSize = { id, w: Math.round(w), h: Math.round(h) };
+          if (resizeFrame) return;
+          resizeFrame = window.requestAnimationFrame(() => {
+            resizeFrame = 0;
+            const next = pendingSize;
+            pendingSize = null;
+            if (!next) return;
+            setClipSizes((previous) => ({ ...previous, [next.id]: { w: next.w, h: next.h } }));
+          });
+        };
+        const onResizeUp = () => {
+          window.removeEventListener('pointermove', onResizeMove);
+          window.removeEventListener('pointerup', onResizeUp);
+          if (resizeFrame) { window.cancelAnimationFrame(resizeFrame); resizeFrame = 0; pendingSize = null; }
+          resize = null;
+          try {
+            window.localStorage.setItem(CLIP_SIZE_KEY, JSON.stringify(clipSizesRef.current));
+          } catch (error) {
+            /* ignore persistence errors */
+          }
+        };
+        /* 缩放：按对角拖动量换系数，宽度与高度各占一半权重，拖起来不偏 */
+        const onScaleMove = (event) => {
+          if (scaleDrag === null) return;
+          const dx = event.clientX - scaleDrag.px;
+          const dy = event.clientY - scaleDrag.py;
+          const ratio = ((scaleDrag.w + dx) / scaleDrag.w + (scaleDrag.h + dy) / scaleDrag.h) / 2;
+          const next = Math.min(WIDGET_SCALE_MAX, Math.max(WIDGET_SCALE_MIN, scaleDrag.scale * ratio));
+          pendingScale = { id: scaleDrag.id, scale: Math.round(next * 1000) / 1000 };
+          if (scaleFrame) return;
+          scaleFrame = window.requestAnimationFrame(() => {
+            scaleFrame = 0;
+            const pendingValue = pendingScale;
+            pendingScale = null;
+            if (!pendingValue) return;
+            setWidgetScales((previous) => ({ ...previous, [pendingValue.id]: pendingValue.scale }));
+          });
+        };
+        const onScaleUp = () => {
+          window.removeEventListener('pointermove', onScaleMove);
+          window.removeEventListener('pointerup', onScaleUp);
+          if (scaleFrame) { window.cancelAnimationFrame(scaleFrame); scaleFrame = 0; pendingScale = null; }
+          scaleDrag = null;
+          try {
+            window.localStorage.setItem(WIDGET_SCALE_KEY, JSON.stringify(widgetScalesRef.current));
+          } catch (error) {
+            /* ignore persistence errors */
+          }
         };
         /* Widgets are portalled outside the plugin root, so close buttons are
            handled natively instead of through React synthetic events. */
         const onClick = (event) => {
           const target = event.target;
           if (!target || typeof target.closest !== 'function') return;
+          const reset = target.closest('.dsh-widget-reset');
+          if (reset) {
+            const owner = reset.closest('.dsh-widget');
+            const ownerId = owner ? owner.getAttribute('data-widget-id') : null;
+            if (ownerId) resetWidgetSize(ownerId);
+            return;
+          }
           const close = target.closest('.dsh-widget-close');
           if (!close) return;
           const widget = close.closest('.dsh-widget');
@@ -1603,6 +2546,13 @@ const VV_OPTIONS = [
           document.removeEventListener('click', onClick);
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
+          window.removeEventListener('pointermove', onResizeMove);
+          window.removeEventListener('pointerup', onResizeUp);
+          window.removeEventListener('pointermove', onScaleMove);
+          window.removeEventListener('pointerup', onScaleUp);
+          if (frame) window.cancelAnimationFrame(frame);
+          if (resizeFrame) window.cancelAnimationFrame(resizeFrame);
+          if (scaleFrame) window.cancelAnimationFrame(scaleFrame);
         };
       }, [editing, viewport.w, viewport.h]);
 
@@ -1679,28 +2629,36 @@ const VV_OPTIONS = [
           },
         },
           editing ? h('div', { className: 'dsh-widget-list' },
-            WIDGET_REGISTRY.map((item) => {
-              const hidden = hiddenWidgets.indexOf(item.id) >= 0;
-              return h('div', {
-                key: item.id,
-                className: 'dsh-widget-list-row',
-                'data-hidden': hidden ? '' : undefined,
-                role: 'switch',
-                'aria-checked': hidden ? 'false' : 'true',
-                tabIndex: 0,
-                title: (hidden ? '显示 ' : '关闭 ') + item.label,
-                onClick: () => setWidgetHidden(item.id, !hidden),
-                onKeyDown: (event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    setWidgetHidden(item.id, !hidden);
-                  }
+            WIDGET_REGISTRY
+              .filter((item) => !item.group || item.id === CLIP_IDS[0])
+              .map((item) => {
+                const members = item.group ? CLIP_IDS : [item.id];
+                const hidden = members.every((id) => hiddenWidgets.indexOf(id) >= 0);
+                const toggle = () => {
+                  members.forEach((id) => setWidgetHidden(id, !hidden));
+                  /* 重新打开剪贴板时，三个方块全部取消最小化 */
+                  if (hidden) undockAllClips();
+                };
+                return h('div', {
+                  key: item.id,
+                  className: 'dsh-widget-list-row',
+                  'data-hidden': hidden ? '' : undefined,
+                  role: 'switch',
+                  'aria-checked': hidden ? 'false' : 'true',
+                  tabIndex: 0,
+                  title: (hidden ? '显示 ' : '关闭 ') + item.label,
+                  onClick: toggle,
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      toggle();
+                    }
+                  },
                 },
-              },
-                h('span', null, item.label),
-                h('span', { className: 'dsh-widget-list-dot', 'aria-hidden': 'true' })
-              );
-            })
+                  h('span', null, item.label),
+                  h('span', { className: 'dsh-widget-list-dot', 'aria-hidden': 'true' })
+                );
+              })
           ) : null,
           h('button', {
             type: 'button',
@@ -1755,10 +2713,124 @@ const VV_OPTIONS = [
       /* All HUD widgets stay in one portal so panels can cover them; React
          synthetic events still do not reach them, so drag/close are native. */
       const widgetNodes = WIDGET_REGISTRY.map((item) => {
-        if (hiddenWidgets.indexOf(item.id) >= 0) return null;
+        if (!item || hiddenWidgets.indexOf(item.id) >= 0) return null;
+        try {
         const ratio = positions[item.id] || item.defaultRatio;
         const x = Math.round(Math.max(0, Math.min(ratio.rx * viewport.w, Math.max(0, viewport.w - 310))));
         const y = Math.round(Math.max(0, Math.min(ratio.ry * viewport.h, Math.max(0, viewport.h - 170))));
+        if (item.group === 'clipboard') {
+          const slotIndex = CLIP_IDS.indexOf(item.id);
+          const slot = clipSlots[slotIndex] || { text: '', image: '', at: 0, docked: false };
+          if (slot.docked) {
+            /* 最小化：变成编号小方块，吸附在第一个还开着的方块上方 */
+            const anchorId = CLIP_IDS.find((id, index) => clipSlots[index] && !clipSlots[index].docked);
+            if (!anchorId) return null;
+            const anchorRatio = positions[anchorId]
+              || (WIDGET_REGISTRY.find((entry) => entry.id === anchorId) || {}).defaultRatio;
+            if (!anchorRatio) return null;
+            const anchorX = Math.round(Math.max(0, Math.min(anchorRatio.rx * viewport.w, Math.max(0, viewport.w - 310))));
+            const anchorY = Math.round(Math.max(0, Math.min(anchorRatio.ry * viewport.h, Math.max(0, viewport.h - 170))));
+            const dockedIds = CLIP_IDS.filter((id, index) => clipSlots[index] && clipSlots[index].docked);
+            const order = dockedIds.indexOf(item.id);
+            const chipY = anchorY - 26 >= 4 ? anchorY - 26 : anchorY + 128;
+            const chipX = Math.max(4, Math.min(viewport.w - 26, Math.round(anchorX + 176 - 24 - order * 26)));
+            return h('div', {
+              key: item.id,
+              className: editing ? 'dsh-widget is-editing dsh-clip-chip' : 'dsh-widget dsh-clip-chip',
+              'data-widget-id': item.id,
+              'data-clip-restore': String(slotIndex),
+              style: { left: `${chipX}px`, top: `${chipY}px` },
+              title: '恢复剪贴板 ' + (slotIndex + 1),
+            }, String(slotIndex + 1));
+          }
+          const size = clipSizes[item.id] || CLIP_DEFAULT_SIZE;
+          const hasContent = Boolean(slot.text || slot.image);
+          const preview = slot.kind === 'text' && slot.text.length > 240
+            ? `${slot.text.slice(0, 240)}…`
+            : slot.text;
+          const slotLabel = '剪贴板 ' + (slotIndex + 1);
+          const slotStyle = {
+            left: `${Number.isFinite(x) ? x : 120}px`,
+            top: `${Number.isFinite(y) ? y : 120}px`,
+            width: `${size.w}px`,
+            height: `${size.h}px`,
+          };
+          /* 编辑模式、且这一格是空的：和余额/时钟一样只盖条纹占位 */
+          if (editing && !hasContent) {
+            return h('div', {
+              key: item.id,
+              className: 'dsh-widget is-editing dsh-clip-slot',
+              'data-widget-id': item.id,
+              'data-empty': '',
+              style: slotStyle,
+              title: slotLabel,
+            },
+              h('div', { className: 'dsh-widget-edit' },
+                h('div', { className: 'dsh-widget-name' }, slotLabel)),
+              h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
+                h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+                  h('path', { d: 'M9.4 4.3A3.9 3.9 0 1 0 9.8 6.8', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }),
+                  h('path', { d: 'M9.7 1.7V4.5H6.9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }))),
+              h('div', { className: 'dsh-clip-resize', 'data-clip-resize': '', title: '拖动调整大小' }),
+            );
+          }
+          /* 用 left/top 定位（transform 在这套宿主里没有生效，方块会被丢到左上角） */
+          return h('div', {
+            key: item.id,
+            className: editing ? 'dsh-widget is-editing dsh-clip-slot' : 'dsh-widget dsh-clip-slot',
+            'data-widget-id': item.id,
+            'data-filled': hasContent ? '' : undefined,
+            'data-empty': hasContent ? undefined : '',
+            'data-armed': clipArmed === slotIndex ? '' : undefined,
+            style: slotStyle,
+            title: slotLabel,
+          },
+            h('div', { className: 'dsh-clip-head' }, 'CLIP ' + (slotIndex + 1)),
+            hasContent ? h('div', {
+              className: 'dsh-clip-body',
+              'data-kind': slot.kind,
+              'data-clip-copy': String(slotIndex),
+            },
+              slot.kind === 'image' && slot.image
+                ? h('img', { className: 'dsh-clip-image', src: slot.image, alt: '' })
+                : slot.kind === 'file'
+                  ? h('div', { className: 'dsh-clip-file' },
+                    h('span', { className: 'dsh-clip-file-icon', 'aria-hidden': 'true' }, '▣'),
+                    h('span', { className: 'dsh-clip-file-name' }, slot.name || slot.text))
+                  : h('div', { className: 'dsh-clip-text' }, preview)
+            ) : null,
+            hasContent ? null
+              : clipArmed === slotIndex
+                ? h('div', { className: 'dsh-clip-hint' }, '按 Ctrl+V 放入')
+                : h('button', {
+                  type: 'button',
+                  className: 'dsh-clip-plus',
+                  'data-clip-action': 'read',
+                  'data-clip-index': String(slotIndex),
+                  title: '从剪贴板读取',
+                }, '+'),
+            h('div', { className: 'dsh-clip-bar' },
+              h('button', { type: 'button', className: 'dsh-clip-btn', 'data-clip-action': 'clear', 'data-clip-index': String(slotIndex), title: '清空' },
+                h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+                  h('path', { d: 'M3 3 L9 9 M9 3 L3 9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'square' })),
+                h('span', { className: 'dsh-clip-btn-text' }, '清空')),
+              h('button', { type: 'button', className: 'dsh-clip-btn', 'data-clip-action': 'send', 'data-clip-index': String(slotIndex), title: '发送到输入框' },
+                h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+                  h('path', { d: 'M2.6 9.4 L9.2 2.8 M4.6 2.8 H9.2 V7.4', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'square' })),
+                h('span', { className: 'dsh-clip-btn-text' }, '发送')),
+              h('button', { type: 'button', className: 'dsh-clip-btn', 'data-clip-action': 'dock', 'data-clip-index': String(slotIndex), title: '最小化' },
+                h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+                  h('path', { d: 'M6 2 V7.4 M3.4 5.2 L6 7.8 L8.6 5.2 M2.4 10 H9.6', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3', strokeLinecap: 'square' })),
+                h('span', { className: 'dsh-clip-btn-text' }, '最小化')),
+            ),
+            editing ? h('div', { className: 'dsh-clip-resize', 'data-clip-resize': '', title: '拖动调整大小' }) : null,
+            editing ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
+              h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+                h('path', { d: 'M9.4 4.3A3.9 3.9 0 1 0 9.8 6.8', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }),
+                h('path', { d: 'M9.7 1.7V4.5H6.9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }))) : null,
+            clipNotice.index === slotIndex ? h('div', { className: 'dsh-clip-notice' }, clipNotice.text) : null,
+          );
+        }
         const body = item.id === 'balance'
           ? h('div', { className: 'dsh-widget-balance', style: editing ? { visibility: 'hidden' } : undefined },
               h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
@@ -1777,6 +2849,7 @@ const VV_OPTIONS = [
                 h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
                 h(SevenNumber, { text: clockText, currency: false }),
                 h(SevenNumber, { text: dateText, currency: false, className: 'dsh-widget-date' }));
+        const widgetScale = widgetScales[item.id] || 1;
         return h('div', {
           key: item.id,
           className: editing ? 'dsh-widget is-editing' : 'dsh-widget',
@@ -1784,23 +2857,88 @@ const VV_OPTIONS = [
           style: { left: `${x}px`, top: `${y}px`, willChange: 'transform' },
           title: item.id === 'balance' ? (balanceError || undefined) : undefined,
         },
-          editing ? h('button', {
-            type: 'button',
-            className: 'dsh-widget-close',
-            title: '关闭' + item.label + '组件',
-            'aria-label': '关闭' + item.label + '组件',
-          }, '×') : null,
-          body,
-          editing
-            ? h('div', { className: 'dsh-widget-edit' }, h('div', { className: 'dsh-widget-name' }, item.label))
-            : null
+          editing ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
+            h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
+              h('path', { d: 'M9.4 4.3A3.9 3.9 0 1 0 9.8 6.8', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }),
+              h('path', { d: 'M9.7 1.7V4.5H6.9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }))) : null,
+          h('div', {
+            className: 'dsh-widget-scale',
+            style: widgetScale === 1 ? undefined : { zoom: widgetScale },
+          },
+            editing ? h('button', {
+              type: 'button',
+              className: 'dsh-widget-close',
+              title: '关闭' + item.label + '组件',
+              'aria-label': '关闭' + item.label + '组件',
+            }, '×') : null,
+            body,
+            editing
+              ? h('div', { className: 'dsh-widget-edit' }, h('div', { className: 'dsh-widget-name' }, item.label))
+              : null,
+            editing
+              ? h('div', { className: 'dsh-widget-resize', 'data-widget-resize': '', title: '拖动缩放' })
+              : null
+          )
         );
+        } catch (error) {
+          /* 单个组件出错不应该拖垮整个主题 */
+          try {
+            const list = window.__dshExvWidgetErrors || [];
+            list.push((item && item.id) + ': ' + String((error && error.message) || error));
+            window.__dshExvWidgetErrors = list.slice(-5);
+          } catch (ignored) { /* ignore */ }
+          console.error('[dsh-exv] widget build failed', item && item.id, error);
+          return null;
+        }
       });
       const renderedWidgets = widgetNodes.filter(Boolean);
       const floatNode = renderedWidgets.length === 0 ? null
         : (floatHost && createPortal
           ? createPortal(h(React.Fragment, null, renderedWidgets), floatHost)
           : h(React.Fragment, null, renderedWidgets));
+
+      /* 自检：把当前渲染现场写进 localStorage，出问题可离线排查 */
+      React.useEffect(() => {
+        try {
+          window.localStorage.setItem('dsh-exv-widget-diag', JSON.stringify({
+            at: new Date().toISOString(),
+            build: '2026-11-08T20:30',
+            editing,
+            tools: toolsPlacement !== null,
+            hidden: hiddenWidgets,
+            visible: WIDGET_REGISTRY.filter((item) => hiddenWidgets.indexOf(item.id) < 0).map((item) => item.id),
+            widgetCount: renderedWidgets.length,
+            floatHost: Boolean(floatHost),
+            errors: window.__dshExvWidgetErrors || [],
+            sizes: clipSizes,
+            positions: CLIP_IDS.map((id) => positions[id] || null),
+            rects: CLIP_IDS.map((id) => {
+              const el = document.querySelector('[data-widget-id="' + id + '"]');
+              if (!el) return null;
+              const r = el.getBoundingClientRect();
+              return {
+                id,
+                x: Math.round(r.left),
+                y: Math.round(r.top),
+                w: Math.round(r.width),
+                h: Math.round(r.height),
+                cls: el.className,
+                pos: window.getComputedStyle(el).position,
+              };
+            }),
+            slots: readClipSlots().map((slot) => ({
+              kind: slot.kind,
+              len: (slot.text || '').length,
+              img: Boolean(slot.image),
+              docked: slot.docked,
+            })),
+            viewport,
+          }));
+        } catch (error) {
+          /* ignore */
+        }
+      }, [editing, hiddenWidgets, clipSlots, clipSizes, floatHost, toolsPlacement !== null, viewport.w, viewport.h]);
+
       return h(React.Fragment, null,
         floating,
         floatNode,
@@ -1820,13 +2958,172 @@ const VV_OPTIONS = [
           }
         };
         ctx.effect(() => ctx.theme.overrideTokens('@local/cyan-theme', tokens));
+        ctx.effect(() => {
+          const onError = (event) => {
+            try {
+              window.localStorage.setItem('dsh-exv-last-uncaught', JSON.stringify({
+                message: String((event.error && event.error.message) || event.message || ''),
+                stack: String((event.error && event.error.stack) || ''),
+                at: new Date().toISOString(),
+              }));
+            } catch (ignored) {
+              /* ignore */
+            }
+            console.error('[dsh-exv] uncaught error', event.error || event.message);
+          };
+          window.addEventListener('error', onError);
+          return () => window.removeEventListener('error', onError);
+        });
         const styleTag = document.createElement('style');
         styleTag.setAttribute('data-dsh-cyan-theme', '');
         styleTag.textContent = css;
         document.head.appendChild(styleTag);
         ctx.effect(() => () => styleTag.remove());
+        /* 尾行保险：流式增长后宿主偶尔会丢掉“贴底”状态，最后一行被输入框挡住。
+           只在「原本就在底部、且内容变高」时补一次贴底；用户主动上滚不干预。 */
+        try {
+          let scroller = null;
+          let observer = null;
+          let lastTop = 0;
+          let lastGap = 0;
+          const attachScrollPin = () => {
+            const next = document.querySelector('[data-conversation-scroll]');
+            if (!next || next === scroller) return;
+            scroller = next;
+            lastTop = scroller.scrollTop;
+            lastGap = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+            if (observer) observer.disconnect();
+            if (typeof ResizeObserver !== 'function') return;
+            observer = new ResizeObserver(() => {
+              if (!scroller || !scroller.isConnected) return;
+              const gap = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+              const top = scroller.scrollTop;
+              /* 用户主动上滚时立刻让出控制权 */
+              if (top < lastTop - 1) {
+                lastTop = top;
+                lastGap = gap;
+                return;
+              }
+              if (lastGap <= 8 && gap > 8 && top <= lastTop + 1) {
+                scroller.scrollTop = scroller.scrollHeight - scroller.clientHeight;
+                lastTop = scroller.scrollTop;
+                lastGap = 0;
+                return;
+              }
+              lastTop = top;
+              lastGap = gap;
+            });
+            observer.observe(scroller);
+            const content = scroller.firstElementChild;
+            if (content) observer.observe(content);
+          };
+          attachScrollPin();
+          const scrollPinTimer = window.setInterval(attachScrollPin, 3000);
+          ctx.effect(() => () => {
+            window.clearInterval(scrollPinTimer);
+            if (observer) observer.disconnect();
+          });
+        } catch (error) {
+          /* 保险失败不影响主题 */
+        }
+        /* 卡顿探针：把长任务与掉帧记录写进 localStorage（dsh-exv-jank），
+           供离线读取，用来判断卡顿是主线程长任务、GC 还是掉帧。 */
+        try {
+          if (!window.__dshExvJank) {
+            window.__dshExvTiming = window.__dshExvTiming || { scan: [], compose: [] };
+            const jank = { longTasks: [], gaps: [], fps: 0, startedAt: Date.now() };
+            window.__dshExvJank = jank;
+            if (typeof PerformanceObserver === 'function') {
+              try {
+                const observer = new PerformanceObserver((list) => {
+                  for (const entry of list.getEntries()) {
+                    if (entry.duration >= 40) {
+                      jank.longTasks.push({ at: Math.round(entry.startTime), ms: Math.round(entry.duration) });
+                      if (jank.longTasks.length > 60) jank.longTasks.shift();
+                    }
+                  }
+                });
+                observer.observe({ type: 'longtask', buffered: true });
+              } catch (error) {
+                /* 宿主不支持 longtask */
+              }
+            }
+            let last = performance.now();
+            let framesInSecond = 0;
+            let secondStart = last;
+            const probeTick = (now) => {
+              window.requestAnimationFrame(probeTick);
+              const gap = now - last;
+              last = now;
+              if (gap > 90) {
+                jank.gaps.push({ at: Math.round(now), ms: Math.round(gap) });
+                if (jank.gaps.length > 60) jank.gaps.shift();
+              }
+              framesInSecond += 1;
+              if (now - secondStart >= 1000) {
+                jank.fps = framesInSecond;
+                framesInSecond = 0;
+                secondStart = now;
+              }
+            };
+            window.requestAnimationFrame(probeTick);
+            const jankTimer = window.setInterval(() => {
+              const memory = performance.memory;
+              const timing = window.__dshExvTiming || { scan: [], compose: [] };
+              const summarize = (list) => {
+                if (!list || list.length === 0) return null;
+                const max = Math.max(...list);
+                const sum = list.reduce((total, value) => total + value, 0);
+                return { n: list.length, max: Math.round(max * 10) / 10, avg: Math.round((sum / list.length) * 10) / 10 };
+              };
+              try {
+                window.localStorage.setItem('dsh-exv-jank', JSON.stringify({
+                  at: Date.now(),
+                  uptimeSec: Math.round((Date.now() - jank.startedAt) / 1000),
+                  heapMB: memory ? Math.round(memory.usedJSHeapSize / 1048576) : null,
+                  fps: jank.fps,
+                  gaps: jank.gaps.slice(-20),
+                  longTasks: jank.longTasks.slice(-20),
+                  scan: summarize(timing.scan),
+                  compose: summarize(timing.compose),
+                }));
+              } catch (error) {
+                /* ignore storage errors */
+              }
+            }, 10000);
+            ctx.effect(() => () => window.clearInterval(jankTimer));
+          }
+        } catch (error) {
+          /* 探针失败不影响主题 */
+        }
+        let wasThinking = false;
+        /* “思考中”标记翻转时通知余额组件刷新：平台结算有延迟，但可以尽早发现 */
+        const syncThinking = (card) => {
+          const primary = card ? card.querySelector('[class*="primary"]') : null;
+          const thinking = Boolean(primary && primary.querySelector('svg rect'));
+          if (card) {
+            if (thinking) card.setAttribute('data-dsh-thinking', '');
+            else card.removeAttribute('data-dsh-thinking');
+          }
+          if (wasThinking && !thinking) {
+            try {
+              window.dispatchEvent(new CustomEvent('dsh-exv-refresh-balance'));
+            } catch (error) {
+              /* ignore */
+            }
+          }
+          wasThinking = thinking;
+        };
         const markComposer = () => {
+          const started = performance.now();
           try {
+            /* 已经标记过、且节点还在、里面仍有输入框：只刷新“思考中”标记，
+               不再每秒重新量一遍 8 层父级的尺寸（那会强制同步布局）。 */
+            const marked = document.querySelector('[data-dsh-composer]');
+            if (marked && marked.isConnected && marked.querySelector('[contenteditable="true"]')) {
+              syncThinking(marked);
+              return;
+            }
             const editor = document.querySelector('[contenteditable="true"]');
             let card = null;
             if (editor) {
@@ -1846,20 +3143,32 @@ const VV_OPTIONS = [
             }
             if (card) {
               card.setAttribute('data-dsh-composer', '');
-              const primary = card.querySelector('[class*="primary"]');
-              if (primary && primary.querySelector('svg rect')) card.setAttribute('data-dsh-thinking', '');
-              else card.removeAttribute('data-dsh-thinking');
+              syncThinking(card);
             }
           } catch (error) {
             /* keep the last marked composer */
           }
+          const timing = window.__dshExvTiming;
+          if (timing && timing.compose) {
+            timing.compose.push(performance.now() - started);
+            if (timing.compose.length > 200) timing.compose.shift();
+          }
         };
         markComposer();
-        const composerTimer = window.setInterval(markComposer, 1000);
+        const composerTimer = window.setInterval(() => {
+          if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => markComposer(), { timeout: 1500 });
+          } else {
+            markComposer();
+          }
+        }, 2000);
         ctx.effect(() => () => window.clearInterval(composerTimer));
         ctx.slots.inject('shell.overlay', () => ctx.slots.register({
           name: 'shell.overlay', id: 'cyan-theme', order: 0,
         }, WidgetBoundary));
+        ctx.slots.inject('shell.overlay', () => ctx.slots.register({
+          name: 'shell.overlay', id: 'cyan-selection-toolbar', order: 1,
+        }, SelectionBoundary));
       },
     };
   },

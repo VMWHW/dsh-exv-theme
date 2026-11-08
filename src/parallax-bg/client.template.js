@@ -293,12 +293,21 @@ const THEME_DEFAULTS = {
       const CELL = 16;
       const GAP = 6;
       const STEP = CELL + GAP;
-      const paint = (alpha) => `rgba(0, 255, 240, ${alpha})`;
-      const headPaint = (alpha) => `rgba(255, 255, 255, ${alpha})`;
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      /* 颜色字符串按 8-bit 透明度预生成：每帧上千次 paint() 不再制造垃圾 */
+      const PAINT_STEPS = 256;
+      const paintTable = [];
+      for (let index = 0; index <= PAINT_STEPS; index += 1) {
+        paintTable.push(`rgba(0, 255, 240, ${(index / PAINT_STEPS).toFixed(3)})`);
+      }
+      const paint = (alpha) => paintTable[Math.max(0, Math.min(PAINT_STEPS, Math.round(alpha * PAINT_STEPS)))];
+      const headPaint = () => 'rgba(255, 255, 255, 1)';
+      /* 不读取 prefers-reduced-motion：本主题的动效就是它的全部内容，
+         而且 Windows 关闭“显示动画”或远程会话下这个偏好会变成 reduce，
+         会让背景直接停住（用户明确要求动画优先）。 */
 
       let width = 0;
       let height = 0;
+      let deviceRatio = 1;
       let strings = [];
       let raf = 0;
       let last = 0;
@@ -310,6 +319,9 @@ const THEME_DEFAULTS = {
       const waves = [];
       const pointer = { x: -10000, y: -10000 };
       let pressing = false;
+      /* 被毛玻璃面板盖住的区域不画：既省绘制，也让面板背后的合成结果稳定下来 */
+      let occluderRects = [];
+      let occludersAt = -1;
 
       const config = () => (getConfig ? getConfig() : null) || {};
       const pointerConfig = () => config().pointer || {};
@@ -343,6 +355,56 @@ const THEME_DEFAULTS = {
         context.strokeRect(x + 0.75, y + 0.75, CELL - 1.5, CELL - 1.5);
       };
 
+      /* 批量描边：同一帧里所有“点亮的格子”按亮度分档，每档只 stroke 一次。
+         逐格 strokeRect（每格都换 strokeStyle + 单独 stroke）在角色光/雨点光
+         这种上千格的场景里非常慢，是掉帧的主因之一。 */
+      const LIGHT_BUCKETS = 12;
+      const lightBuckets = [];
+      for (let index = 0; index < LIGHT_BUCKETS; index += 1) lightBuckets.push([]);
+      const queueCell = (col, row, alpha) => {
+        if (alpha <= 0.012) return;
+        const x = 6 + col * STEP;
+        const y = row * STEP;
+        if (x < -STEP || x > width + STEP || y < -STEP || y > height + STEP) return;
+        const level = Math.min(LIGHT_BUCKETS - 1, Math.floor(alpha * LIGHT_BUCKETS));
+        lightBuckets[level].push(x, y);
+      };
+      const flushLightCells = () => {
+        context.lineWidth = 1.5;
+        for (let level = 0; level < LIGHT_BUCKETS; level += 1) {
+          const cells = lightBuckets[level];
+          if (cells.length === 0) continue;
+          context.beginPath();
+          for (let index = 0; index < cells.length; index += 2) {
+            context.rect(cells[index] + 0.75, cells[index + 1] + 0.75, CELL - 1.5, CELL - 1.5);
+          }
+          context.strokeStyle = paint(((level + 0.5) / LIGHT_BUCKETS) * 0.95);
+          context.stroke();
+          cells.length = 0;
+        }
+      };
+
+      /* 雨点头部光晕：预渲染一次，之后每帧只 drawImage，替代昂贵的 shadowBlur */
+      let headGlowCanvas = null;
+      const headGlowSprite = () => {
+        if (headGlowCanvas) return headGlowCanvas;
+        const size = 96;
+        const surface = document.createElement('canvas');
+        surface.width = size;
+        surface.height = size;
+        const glowContext = surface.getContext('2d');
+        const gradient = glowContext.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+        gradient.addColorStop(0.10, 'rgba(226, 255, 252, 0.85)');
+        gradient.addColorStop(0.34, 'rgba(0, 255, 240, 0.26)');
+        gradient.addColorStop(0.66, 'rgba(0, 255, 240, 0.07)');
+        gradient.addColorStop(1, 'rgba(0, 255, 240, 0)');
+        glowContext.fillStyle = gradient;
+        glowContext.fillRect(0, 0, size, size);
+        headGlowCanvas = surface;
+        return surface;
+      };
+
       /** Light the hollow outlines around a point, fading with distance. */
       const strokeHalo = (centerX, centerY, radius, peak) => {
         const minCol = Math.floor((centerX - radius) / STEP);
@@ -355,7 +417,7 @@ const THEME_DEFAULTS = {
             const cy = row * STEP + CELL / 2;
             const distance = Math.hypot(cx - centerX, cy - centerY);
             if (distance > radius) continue;
-            strokeCell(col, row, peak * (1 - distance / radius));
+            queueCell(col, row, peak * (1 - distance / radius));
           }
         }
       };
@@ -391,8 +453,152 @@ const THEME_DEFAULTS = {
             const cy = row * STEP + CELL / 2;
             const distance = Math.hypot(cx - pointer.x, cy - pointer.y);
             if (distance > radius) continue;
-            strokeCell(col, row, Math.min(1, (1 - distance / radius) * 0.95 * strength));
+            queueCell(col, row, Math.min(1, (1 - distance / radius) * 0.95 * strength));
           }
+        }
+      };
+
+      /* ---- 扫描波 / 点击涟漪 ------------------------------------------
+         点击涟漪：只保留网格响应（和 2.0 一致）。
+         扫描波：一条"锋面亮线 + 柔和径向渐变光环"的光带，光带扫过的方格各自
+         记下时间戳，之后按线性亮度衰减——余辉只存在于方格上，背景和雨丝完全
+         不受影响。光带宽度、扫过速度、可点亮的格子数都按当前视口换算，
+         小窗 / 1080p / 4K 的观感一致，也不会有格子被上限截断的斑块。 */
+      const TAU = Math.PI * 2;
+      const CELL_TRAIL_SECONDS = 2.4;  /* 单格余辉保留时长（秒，线性衰减；调短可减负） */
+      const CELL_FADE_BUCKETS = 72;    /* 按亮度分档批量描边；档位够细才没有阶梯 */
+      const LIT_CELL_HARD_CAP = 24000; /* 超大屏下的内存/绘制硬上限 */
+
+      /* 光带本体：一个径向渐变光环负责泛光，两道圆弧负责清晰的锋面。
+         之前用 7 层同心描边叠亮度，层数少时能看出同心台阶；渐变是连续的。
+         渐变直接画在主画布上（离屏放大在软件光栅下反而更慢）。 */
+      const strokeBeam = (centerX, centerY, radius, intensity) => {
+        if (radius <= 0 || intensity <= 0.004) return;
+        const alpha = Math.min(1, intensity);
+        /* 光带宽度跟着视口走：小窗窄一点，4K 宽一点 */
+        const scale = Math.max(0.7, Math.min(2.2, Math.hypot(width, height) / 2400));
+        const glow = 180 * scale;
+        const inner = Math.max(0, radius - glow);
+        const outer = Math.max(radius + glow, inner + 1);
+        /* 亮度剖面以 radius 为中心、向两侧对称衰减；写成连续 stop，
+           峰位按 radius 实际落在渐变里的比例换算，起步阶段也不会偏成一圈光斑。 */
+        const peak = (radius - inner) / (outer - inner);
+        const profile = [
+          [-1, 0], [-0.68, 0.012], [-0.44, 0.05], [-0.24, 0.15],
+          [-0.10, 0.40], [0, 0.86],
+          [0.10, 0.40], [0.24, 0.15], [0.44, 0.05], [0.68, 0.012], [1, 0],
+        ];
+        const stops = [];
+        for (const [offset, value] of profile) {
+          const at = peak + offset * 0.5;
+          if (at < 0 || at > 1) continue;
+          stops.push([at, value]);
+        }
+        if (stops.length === 0 || stops[0][0] > 0) stops.unshift([0, 0]);
+        if (stops[stops.length - 1][0] < 1) stops.push([1, 0]);
+        const gradient = context.createRadialGradient(centerX, centerY, inner, centerX, centerY, outer);
+        for (const [at, value] of stops) gradient.addColorStop(at, paint(value * alpha));
+        context.fillStyle = gradient;
+        /* 只填光带本身那一圈：整盘填充在 4K 上等于每帧刷满全屏，太贵 */
+        context.beginPath();
+        context.arc(centerX, centerY, outer, 0, TAU, false);
+        if (inner > 0.5) context.arc(centerX, centerY, inner, 0, TAU, true);
+        context.fill('evenodd');
+        context.beginPath();
+        context.arc(centerX, centerY, radius, 0, TAU);
+        context.lineWidth = 2.4 * scale;
+        context.strokeStyle = paint(0.42 * alpha);
+        context.stroke();
+        context.beginPath();
+        context.arc(centerX, centerY, radius, 0, TAU);
+        context.lineWidth = 1.1 * scale;
+        context.strokeStyle = `rgba(242, 255, 253, ${alpha})`;
+        context.stroke();
+      };
+
+      /* 被扫过的方格：key = "col:row" -> { x, y, t, a } */
+      const litCells = new Map();
+
+      const stampCells = (wave, radius, strength, now) => {
+        if (strength <= 0.01) return;
+        const inner = Math.max(0, radius - STEP * 0.9);
+        const outer = radius + STEP * 0.9;
+        const outer2 = outer * outer;
+        const inner2 = inner * inner;
+        /* 只点亮画布内的格子：屏幕外的余辉没人看，却会让每帧的遍历量翻几倍 */
+        const maxColIndex = Math.floor((width - CELL) / STEP);
+        const maxRowIndex = Math.floor((height - CELL) / STEP);
+        const minCol = Math.max(0, Math.floor((wave.x - outer) / STEP));
+        const maxCol = Math.min(maxColIndex, Math.ceil((wave.x + outer) / STEP));
+        /* 上限跟着格网大小走：4K 有约 1.7 万格，固定 9000 会让余辉被截断成斑块 */
+        const cellCount = (maxColIndex + 1) * (maxRowIndex + 1);
+        const cap = Math.min(LIT_CELL_HARD_CAP, Math.max(512, cellCount));
+        const half = CELL / 2;
+        const touch = (col, row) => {
+          if (col < 0 || row < 0 || col > maxColIndex || row > maxRowIndex) return;
+          const px = 6 + col * STEP + half;
+          const py = row * STEP + CELL / 2;
+          for (const rect of occluderRects) {
+            if (px >= rect.x && px <= rect.x + rect.w && py >= rect.y && py <= rect.y + rect.h) return;
+          }
+          const key = col + ':' + row;
+          const cell = litCells.get(key);
+          if (cell) {
+            cell.t = now;
+            if (strength > cell.a) cell.a = strength;
+          } else if (litCells.size < cap) {
+            litCells.set(key, { x: 6 + col * STEP, y: row * STEP, t: now, a: strength });
+          }
+        };
+        /* 只遍历圆环内的格子：按列解出上下两段行区间，
+           避免在外接正方形里逐格算距离（4K 下那是每帧七万次）。 */
+        for (let col = minCol; col <= maxCol; col += 1) {
+          const cx = 6 + col * STEP + half;
+          const dx = cx - wave.x;
+          const dx2 = dx * dx;
+          if (dx2 > outer2) continue;
+          const dyOuter = Math.sqrt(outer2 - dx2);
+          const dyInner = dx2 < inner2 ? Math.sqrt(inner2 - dx2) : 0;
+          const topMin = Math.ceil((wave.y + dyInner - half) / STEP);
+          const topMax = Math.floor((wave.y + dyOuter - half) / STEP);
+          for (let row = topMin; row <= topMax; row += 1) touch(col, row);
+          const bottomMin = Math.ceil((wave.y - dyOuter - half) / STEP);
+          const bottomMax = Math.floor((wave.y - dyInner - half) / STEP);
+          for (let row = bottomMin; row <= bottomMax; row += 1) touch(col, row);
+        }
+      };
+
+      /* 按亮度分档批量画：每档一次 stroke，几千个方格也只有几十次绘制。
+         分档数组复用，避免每帧新建 72 个数组制造 GC 抖动。 */
+      const waveBuckets = [];
+      for (let level = 0; level < CELL_FADE_BUCKETS; level += 1) waveBuckets.push([]);
+      const drawLitCells = (now) => {
+        if (litCells.size === 0) return;
+        for (const [key, cell] of litCells) {
+          const age = (now - cell.t) / 1000;
+          if (age >= CELL_TRAIL_SECONDS) {
+            litCells.delete(key);
+            continue;
+          }
+          /* 线性衰减：亮度随时间均匀下降，不再先陡后缓 */
+          const fade = 1 - age / CELL_TRAIL_SECONDS;
+          const alpha = cell.a * fade;
+          if (alpha <= 0.012) continue;
+          const level = Math.min(CELL_FADE_BUCKETS - 1, Math.floor(alpha * CELL_FADE_BUCKETS));
+          waveBuckets[level].push(cell);
+        }
+        context.lineWidth = 1.5;
+        for (let level = 0; level < CELL_FADE_BUCKETS; level += 1) {
+          const cells = waveBuckets[level];
+          if (cells.length === 0) continue;
+          context.beginPath();
+          /* 逐格描边：方格之间保留空隙，这是背景网格的原有观感 */
+          for (const cell of cells) {
+            context.rect(cell.x + 0.75, cell.y + 0.75, CELL - 1.5, CELL - 1.5);
+          }
+          context.strokeStyle = paint(((level + 0.5) / CELL_FADE_BUCKETS) * 0.95);
+          context.stroke();
+          cells.length = 0;
         }
       };
 
@@ -414,14 +620,40 @@ const THEME_DEFAULTS = {
             continue;
           }
           const speed = scan ? (Number(wave.speed) || 320) : 560;
-          const radius = ((now - wave.born) / 1000) * speed;
+          const age = (now - wave.born) / 1000;
+          let radius = age * speed;
+          if (scan) {
+            /* 掉帧时不让光带一下子跳出去：每帧最多前进 50ms 的距离，
+               追上时间目标之前看起来是连续滑过去的；长时间不可见后恢复时
+               直接把落后量截到 250ms，避免光带慢慢爬。 */
+            const target = radius;
+            if (wave.displayRadius === undefined) {
+              wave.displayRadius = target;
+            } else {
+              const lagLimit = speed * 0.25;
+              wave.displayRadius = Math.min(
+                target,
+                Math.max(wave.displayRadius + speed * 0.05, target - lagLimit),
+              );
+            }
+            radius = wave.displayRadius;
+          }
           let attenuation = 1;
           if (scan) {
-            const maxRadius = Number(wave.maxRadius) || Math.hypot(width, height) + STEP * 2;
+            /* 半径上限按"当前"画布算：波扫到一半用户改窗口大小也不会扫不到边 */
+            const maxRadius = Math.hypot(width, height) + STEP * 2;
             if (radius > maxRadius) {
               waves.splice(index, 1);
               continue;
             }
+            /* 起步 0.25s 淡入，收尾 16% 半径淡出，避免光带头尾硬切 */
+            const fadeIn = Math.min(1, age / 0.25);
+            const fadeOut = Math.max(0, Math.min(1, (maxRadius - radius) / (maxRadius * 0.16)));
+            const strength = 0.95 * Math.min(fadeIn, fadeOut) * brightness;
+            /* 光带扫过的方格单独记时间，之后各自衰减 */
+            stampCells(wave, radius, strength, now);
+            strokeBeam(wave.x, wave.y, radius, strength);
+            continue;
           } else {
             attenuation = 1 - radius / clickMaxRadius;
             if (attenuation <= 0) {
@@ -429,6 +661,8 @@ const THEME_DEFAULTS = {
               continue;
             }
           }
+
+          /* 点击涟漪：只保留网格响应 */
           const inner = Math.max(0, radius - STEP * 0.9);
           const outer = radius + STEP * 0.9;
           const minCol = Math.floor((wave.x - outer) / STEP);
@@ -445,6 +679,7 @@ const THEME_DEFAULTS = {
             }
           }
         }
+        drawLitCells(now);
       };
 
       /* One-shot startup scan: same grid ring as a click ripple, but it runs
@@ -458,8 +693,8 @@ const THEME_DEFAULTS = {
           x: Number.isFinite(x) ? x : w / 2,
           y: Number.isFinite(y) ? y : h / 2,
           born: performance.now(),
-          speed: Math.max(180, diagonal / 8),
-          maxRadius: diagonal + STEP * 2,
+          /* 按对角线换算速度：任何窗口比例、任何分辨率下都是约 7 秒扫完整个屏幕 */
+          speed: Math.max(150, diagonal / 7),
         });
       };
 
@@ -493,7 +728,7 @@ const THEME_DEFAULTS = {
                 distance = Math.hypot(dx, dy);
               }
               if (distance > range) continue;
-              strokeCell(col, row, 0.8 * (1 - distance / range));
+              queueCell(col, row, 0.8 * (1 - distance / range));
             }
           }
         }
@@ -531,6 +766,9 @@ const THEME_DEFAULTS = {
         return charMask;
       };
 
+      /* 角色光晕是静态的：按 (遮罩, 图片位置, 画布尺寸, 强度) 生成一次分档
+         Path2D，之后每帧只 stroke；不再每帧逐像素重算 + 逐格 strokeRect。 */
+      let charLightCache = null;
       const drawCharacterLight = () => {
         const img = getCharacter ? getCharacter() : null;
         if (!img || !img.complete || !img.naturalWidth) return;
@@ -545,29 +783,87 @@ const THEME_DEFAULTS = {
         if (!mask) return;
         const rect = img.getBoundingClientRect();
         if (rect.width < 2 || rect.height < 2) return;
+        if (typeof Path2D === 'undefined') return;
         const bounds = canvas.getBoundingClientRect();
-        const minCol = Math.floor((rect.left - range - bounds.left - 6) / STEP);
-        const maxCol = Math.ceil((rect.right + range - bounds.left - 6) / STEP);
-        const minRow = Math.floor((rect.top - range - bounds.top) / STEP);
-        const maxRow = Math.ceil((rect.bottom + range - bounds.top) / STEP);
-        for (let col = minCol; col <= maxCol; col += 1) {
-          for (let row = minRow; row <= maxRow; row += 1) {
-            const x = 6 + col * STEP + CELL / 2;
-            const y = row * STEP + CELL / 2;
-            const u = (bounds.left + x - rect.left) / rect.width;
-            const v = (bounds.top + y - rect.top) / rect.height;
-            if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-            const mx = Math.min(mask.width - 1, Math.max(0, Math.floor(u * mask.width)));
-            const my = Math.min(mask.height - 1, Math.max(0, Math.floor(v * mask.height)));
-            const alpha = mask.data[(my * mask.width + mx) * 4 + 3] / 255;
-            if (alpha <= 0.02) continue;
-            strokeCell(col, row, Math.min(1, alpha * strength * 0.95));
+        const signature = [
+          mask.src, mask.blur,
+          Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height),
+          Math.round(bounds.left), Math.round(bounds.top),
+          width, height, Math.round(strength * 100), range,
+        ].join('|');
+        if (!charLightCache || charLightCache.signature !== signature) {
+          const paths = [];
+          for (let level = 0; level < LIGHT_BUCKETS; level += 1) paths.push(null);
+          const minCol = Math.floor((rect.left - range - bounds.left - 6) / STEP);
+          const maxCol = Math.ceil((rect.right + range - bounds.left - 6) / STEP);
+          const minRow = Math.floor((rect.top - range - bounds.top) / STEP);
+          const maxRow = Math.ceil((rect.bottom + range - bounds.top) / STEP);
+          for (let col = minCol; col <= maxCol; col += 1) {
+            for (let row = minRow; row <= maxRow; row += 1) {
+              const x = 6 + col * STEP + CELL / 2;
+              const y = row * STEP + CELL / 2;
+              const u = (bounds.left + x - rect.left) / rect.width;
+              const v = (bounds.top + y - rect.top) / rect.height;
+              if (u < 0 || u > 1 || v < 0 || v > 1) continue;
+              const mx = Math.min(mask.width - 1, Math.max(0, Math.floor(u * mask.width)));
+              const my = Math.min(mask.height - 1, Math.max(0, Math.floor(v * mask.height)));
+              const alpha = mask.data[(my * mask.width + mx) * 4 + 3] / 255;
+              if (alpha <= 0.02) continue;
+              const value = Math.min(1, alpha * strength * 0.95);
+              if (value <= 0.012) continue;
+              const level = Math.min(LIGHT_BUCKETS - 1, Math.floor(value * LIGHT_BUCKETS));
+              if (!paths[level]) paths[level] = new Path2D();
+              paths[level].rect(6 + col * STEP + 0.75, row * STEP + 0.75, CELL - 1.5, CELL - 1.5);
+            }
           }
+          charLightCache = { signature, paths };
+        }
+        context.lineWidth = 1.5;
+        for (let level = 0; level < LIGHT_BUCKETS; level += 1) {
+          const path = charLightCache.paths[level];
+          if (!path) continue;
+          context.strokeStyle = paint(((level + 0.5) / LIGHT_BUCKETS) * 0.95);
+          context.stroke(path);
         }
       };
 
+      const refreshOccluders = () => {
+        const rects = [];
+        const push = (element) => {
+          if (!element) return;
+          const rect = element.getBoundingClientRect();
+          if (rect.width < 4 || rect.height < 4) return;
+          rects.push({ x: rect.left, y: rect.top, w: rect.width, h: rect.height });
+        };
+        try {
+          push(document.querySelector('[data-dsh-sidebar]'));
+          push(document.querySelector('[data-dsh-rightbar]'));
+          push(document.querySelector('header[data-window-drag]'));
+          push(document.querySelector('[data-dsh-composer]'));
+          if (document.documentElement.hasAttribute('data-windows-titlebar')) {
+            const raw = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dsh-windows-titlebar-height'));
+            if (Number.isFinite(raw) && raw > 0) rects.push({ x: 0, y: 0, w: width, h: raw });
+          }
+        } catch (error) {
+          /* ignore */
+        }
+        occluderRects = rects;
+        occludersAt = performance.now();
+      };
+
       const draw = () => {
+        if (occludersAt < 0 || performance.now() - occludersAt > 800) refreshOccluders();
         context.clearRect(0, 0, width, height);
+        const clipped = occluderRects.length > 0;
+        if (clipped) {
+          context.save();
+          context.beginPath();
+          context.rect(0, 0, width, height);
+          for (const rect of occluderRects) context.rect(rect.x, rect.y, rect.w, rect.h);
+          context.clip('evenodd');
+        }
+        const glow = headGlowSprite();
+        const glowRadius = STEP * 2.4;
         for (const string of strings) {
           for (let index = 0; index < string.len; index += 1) {
             const y = string.y - index * STEP;
@@ -575,12 +871,15 @@ const THEME_DEFAULTS = {
             const square = string.squares[index];
             if (index === 0) {
               /* The same soft halo as the cursor, centered on the head. */
-              context.shadowBlur = 0;
               strokeHalo(string.x + CELL / 2, string.y + CELL / 2, STEP * 2.4, 0.30);
-              context.shadowBlur = 26;
-              context.shadowColor = headPaint(1);
-            } else {
-              context.shadowBlur = 0;
+              /* 预渲染的白色光晕代替 shadowBlur：模糊阴影每帧都很贵 */
+              context.drawImage(
+                glow,
+                string.x + CELL / 2 - glowRadius,
+                string.y + CELL / 2 - glowRadius,
+                glowRadius * 2,
+                glowRadius * 2,
+              );
             }
             if (square.hollow) {
               context.strokeStyle = paint(square.alpha);
@@ -597,34 +896,43 @@ const THEME_DEFAULTS = {
         drawPointerLight();
         drawPointerPressLight();
         drawWidgetLight();
+        flushLightCells();
         drawCharacterLight();
         drawWaves(performance.now());
         context.globalCompositeOperation = 'source-over';
+        if (clipped) context.restore();
       };
 
       const tick = (now) => {
-        const rainCfg = config().rain || {};
-        const fps = Math.max(1, Math.min(60, Number(rainCfg.fps) || 60));
-        if (lastFrame && now - lastFrame < 1000 / fps - 0.5) {
-          raf = requestAnimationFrame(tick);
-          return;
-        }
-        lastFrame = now;
-        const speedScale = Math.max(0.25, Math.min(2, (Number(rainCfg.speed) || 100) / 100));
-        const delta = last ? Math.min(0.06, (now - last) / 1000) : 0.016;
-        last = now;
-        for (const string of strings) {
-          string.remainder += string.speed * speedScale * delta;
-          if (string.remainder >= STEP) {
-            const steps = Math.floor(string.remainder / STEP);
-            string.y += steps * STEP;
-            string.remainder -= steps * STEP;
+        try {
+          if (window.__dshExvDebug) window.__dshExvDebug.rainFrames += 1;
+          const rainCfg = config().rain || {};
+          const fps = Math.max(1, Math.min(60, Number(rainCfg.fps) || 60));
+          if (!lastFrame || now - lastFrame >= 1000 / fps - 0.5) {
+            lastFrame = now;
+            const speedScale = Math.max(0.25, Math.min(2, (Number(rainCfg.speed) || 100) / 100));
+            const delta = last ? Math.min(0.06, (now - last) / 1000) : 0.016;
+            last = now;
+            for (const string of strings) {
+              string.remainder += string.speed * speedScale * delta;
+              if (string.remainder >= STEP) {
+                const steps = Math.floor(string.remainder / STEP);
+                string.y += steps * STEP;
+                string.remainder -= steps * STEP;
+              }
+              if (string.y - string.len * STEP > height) {
+                Object.assign(string, spawn(false));
+              }
+            }
+            draw();
           }
-          if (string.y - string.len * STEP > height) {
-            Object.assign(string, spawn(false));
+        } catch (error) {
+          /* 单帧异常不能杀死循环，否则背景会永久停住 */
+          if (!tick.reported) {
+            tick.reported = true;
+            console.error('[dsh-exv] rain frame failed', error);
           }
         }
-        draw();
         raf = requestAnimationFrame(tick);
       };
 
@@ -634,7 +942,7 @@ const THEME_DEFAULTS = {
       };
 
       const start = () => {
-        if (raf || !enabled || !active || reduceMotion.matches) return;
+        if (raf || !enabled || !active) return;
         last = 0;
         lastFrame = 0;
         raf = requestAnimationFrame(tick);
@@ -657,6 +965,7 @@ const THEME_DEFAULTS = {
         const ratio = Math.max(0.25, Math.min(window.devicePixelRatio || 1, 2, cap / Math.max(1, height)));
         canvas.width = Math.round(width * ratio);
         canvas.height = Math.round(height * ratio);
+        deviceRatio = ratio;
         context.setTransform(ratio, 0, 0, ratio, 0, 0);
         strings = [];
         syncStringCount();
@@ -738,6 +1047,7 @@ const THEME_DEFAULTS = {
       style.textContent = css;
       document.head.appendChild(style);
 
+      window.__dshExvDebug = { rainFrames: 0, parallaxFrames: 0 };
       const root = document.createElement('div');
       root.id = 'dsh-parallax';
       root.setAttribute('aria-hidden', 'true');
@@ -1272,7 +1582,9 @@ const THEME_DEFAULTS = {
       let raf = 0;
       let gridLast = 0;
       let pressActive = false;
-      const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+      let lastPointerAt = 0;
+      let lastLayerWrite = 0;
+      /* 不再读取 prefers-reduced-motion，理由见 startRain 顶部注释。 */
 
       const updatePressGlow = () => {
         const press = (config && config.pointer && config.pointer.press) || { enabled: true, strength: 100 };
@@ -1285,6 +1597,7 @@ const THEME_DEFAULTS = {
       };
 
       const onPointerMove = (event) => {
+        lastPointerAt = performance.now();
         targetX = (event.clientX / window.innerWidth - 0.5) * 2;
         targetY = (event.clientY / window.innerHeight - 0.5) * 2;
         pressGlow.style.left = `${event.clientX}px`;
@@ -1309,18 +1622,22 @@ const THEME_DEFAULTS = {
 
       const tick = () => {
         raf = requestAnimationFrame(tick);
-        if (reduceMotion.matches) {
-          targetX = 0;
-          targetY = 0;
-        }
-        const time = performance.now() / 1000;
+        try {
+        if (window.__dshExvDebug) window.__dshExvDebug.parallaxFrames += 1;
+        const nowMs = performance.now();
+        const time = nowMs / 1000;
+        /* 指针静止时只有“呼吸”在动，15fps 足够（肉眼看不出来）；
+           每帧写 transform 会让下面的毛玻璃面板反复重算背景模糊，代价很高。 */
+        const pointerActive = pressActive || nowMs - lastPointerAt < 600;
+        if (!pointerActive && nowMs - lastLayerWrite < 66) return;
+        lastLayerWrite = nowMs;
         let widgetX = 0;
         let widgetY = 0;
         const rainConfig = config && config.rain ? config.rain : null;
         if (rainConfig && rainConfig.enabled && rainConfig.grid && time - gridLast >= 0.1) {
           gridLast = time;
           const strength = rainConfig.gridBreathing && rainConfig.gridBreathing.enabled !== false ? rainConfig.gridBreathing.strength / 100 : 0;
-          const phase = reduceMotion.matches ? 1 : 1 - 0.5 * strength * (0.5 - 0.5 * Math.cos(time * (Math.PI * 2 / 6)));
+          const phase = 1 - 0.5 * strength * (0.5 - 0.5 * Math.cos(time * (Math.PI * 2 / 6)));
           grid.style.opacity = String((rainConfig.gridBrightness / 200) * phase);
         }
         for (const node of nodes) {
@@ -1330,7 +1647,7 @@ const THEME_DEFAULTS = {
           node.y += (nextY - node.y) * node.ease;
           const group = BREATH_GROUP[node.el.dataset.layer];
           const breathing = config && group && config[group] ? config[group].breathing : null;
-          const amplitude = reduceMotion.matches || !breathing || breathing.enabled === false ? 0 : breathing.amplitude;
+          const amplitude = !breathing || breathing.enabled === false ? 0 : breathing.amplitude;
           const breatheX = Math.sin(time * 0.22) * amplitude;
           const breatheY = Math.cos(time * 0.27) * amplitude * (8 / 12);
           const direction = node.el.dataset.layer === 'vv' ? 1 : -1;
@@ -1342,7 +1659,14 @@ const THEME_DEFAULTS = {
             widgetY = y;
           }
         }
-        window.__dshWidgetMotion = { x: widgetX, y: widgetY };
+          window.__dshWidgetMotion = { x: widgetX, y: widgetY };
+        } catch (error) {
+          /* 单帧异常不能杀死背景循环 */
+          if (!tick.reported) {
+            tick.reported = true;
+            console.error('[dsh-exv] parallax frame failed', error);
+          }
+        }
       };
 
       window.addEventListener('pointermove', onPointerMove, { passive: true });
@@ -1353,7 +1677,14 @@ const THEME_DEFAULTS = {
       window.addEventListener('blur', onPressUp);
       let pageActive = !document.hidden;
       const syncPageActivity = () => {
-        pageActive = !document.hidden;
+        /* 窗口有焦点时用户一定在看，即使 Chromium 把页面误判为 hidden 也照常跑 */
+        pageActive = !document.hidden || document.hasFocus();
+        if (window.__dshExvDebug) {
+          window.__dshExvDebug.hidden = document.hidden;
+          window.__dshExvDebug.focus = document.hasFocus();
+          window.__dshExvDebug.pageActive = pageActive;
+          window.__dshExvDebug.parallaxRaf = Boolean(raf);
+        }
         if (pageActive) {
           if (!raf) tick();
         } else if (raf) {
@@ -1370,9 +1701,12 @@ const THEME_DEFAULTS = {
       };
       document.addEventListener('visibilitychange', syncPageActivity);
       syncPageActivity();
+      /* 自愈：窗口可见但循环停了（单帧异常或漏掉的可见性事件）时自动拉起 */
+      const activityTimer = window.setInterval(syncPageActivity, 1500);
 
       return () => {
         cancelAnimationFrame(raf);
+        window.clearInterval(activityTimer);
         document.removeEventListener('visibilitychange', syncPageActivity);
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerleave', onPointerLeave);
@@ -1382,6 +1716,7 @@ const THEME_DEFAULTS = {
         window.removeEventListener('blur', onPressUp);
         if (unsubscribe) unsubscribe();
         delete window.__dshWidgetMotion;
+        delete window.__dshExvDebug;
         window.clearTimeout(live2d.idleTimer);
         for (const [, entry] of live2d.cache) disposeLive2DEntry(entry);
         live2d.cache.clear();
@@ -1400,7 +1735,17 @@ const THEME_DEFAULTS = {
     return {
       inject: ['slots'],
       apply(ctx) {
-        ctx.effect(() => mount());
+        ctx.effect(() => {
+          try {
+            return mount();
+          } catch (error) {
+            /* 挂载异常会被宿主吞掉，这里留一份可查的现场 */
+            window.__dshExvDebug = window.__dshExvDebug || {};
+            window.__dshExvDebug.mountError = String((error && error.stack) || error);
+            console.error('[dsh-exv] parallax mount failed', error);
+            return () => {};
+          }
+        });
       },
     };
   },
