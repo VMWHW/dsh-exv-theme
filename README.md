@@ -8,6 +8,10 @@
 - `parallax-bg`：视差背景、代码雨、15 个 Live2D 动态预设、入场/待机、模型缓存、帧率/密度/分辨率设置
 - `flat-corners`：去除界面圆角
 
+<img width="2560" height="1440" alt="无标题-tuya" src="https://github.com/user-attachments/assets/81479d15-ee22-496d-b08e-70d3425adbcf" /><img width="1164" height="761" alt="无标题-tuya" src="https://github.com/user-attachments/assets/6776baa6-0037-4aa7-81f3-ddfd19eb3fd9" />
+<img width="1164" height="540" alt="无标题-tuya" src="https://github.com/user-attachments/assets/ebb79364-d4fb-4806-9ea1-cc9436a773c1" />
+<img width="808" height="809" alt="无标题-tuya" src="https://github.com/user-attachments/assets/cb75588d-ba86-4986-bd5e-2e9e56d4cd84" />
+
 ## 安装前
 
 1. 先启动一次 DSH 客户端，完成初始化，看到主界面即可；
