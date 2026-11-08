@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 下载安装包
+    url: https://github.com/VMWHW/dsh-exv-theme/releases
+    about: 普通使用请直接下载 Release 里的 zip，不需要构建。
+  - name: 从源码构建
+    url: https://github.com/VMWHW/dsh-exv-theme/blob/main/BUILDING.md
+    about: 想改代码或自行重建 parallax-bg 时看这里。

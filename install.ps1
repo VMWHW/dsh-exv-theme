@@ -90,6 +90,33 @@ function Remove-OldBackups([string]$Directory, [string]$Filter, [int]$Keep) {
   }
 }
 
+# checksums.txt 由 tools/package.ps1 生成；存在就逐个校验插件载荷，防止包损坏或被改动。
+function Test-PayloadChecksums([string]$Root) {
+  $manifest = Join-Path $Root 'checksums.txt'
+  if (-not (Test-Path -LiteralPath $manifest)) {
+    Write-Note '未提供 checksums.txt，跳过载荷校验。'
+    return
+  }
+  $checked = 0
+  foreach ($line in Get-Content -LiteralPath $manifest) {
+    if ([string]::IsNullOrWhiteSpace($line)) { continue }
+    $trimmed = $line.Trim()
+    if ($trimmed.StartsWith('#')) { continue }
+    $match = [regex]::Match($trimmed, '^([0-9a-fA-F]{64})\s+\*?(.+)$')
+    if (-not $match.Success) { throw "checksums.txt 格式无法解析：$trimmed" }
+    $expected = $match.Groups[1].Value.ToLower()
+    $relative = $match.Groups[2].Value.Trim()
+    $file = Join-Path $Root $relative
+    if (-not (Test-Path -LiteralPath $file)) { throw "载荷校验失败：缺少 $relative" }
+    $actual = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLower()
+    if ($actual -ne $expected) {
+      throw "载荷校验失败：$relative 的 sha256 与清单不符（文件可能损坏或被改动）"
+    }
+    $checked += 1
+  }
+  Write-Step "载荷校验通过（$checked 个文件）"
+}
+
 $movedPlugins = New-Object System.Collections.ArrayList
 $profilePkg = ''
 $profileBackup = ''
@@ -114,6 +141,9 @@ try {
   if (-not (Test-Path -LiteralPath $payload)) {
     throw "安装包不完整：找不到 $payload。请重新解压完整的安装包。"
   }
+
+  # ---- 0. 载荷校验（有清单才校验）----------------------------------------
+  Test-PayloadChecksums -Root $PSScriptRoot
 
   $isLiveHome = ((Normalize-FullPath (Join-Path $env:USERPROFILE '.dsh')) -eq $dshHome)
   $exe = Join-Path $env:LOCALAPPDATA 'Programs\DeepSeek Harness\DeepSeek Harness.exe'

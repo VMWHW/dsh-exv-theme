@@ -1,0 +1,64 @@
+name: 问题反馈
+description: 安装失败、显示异常或崩溃
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈。**动手前请先确认**：你用的是 [Releases](../../releases) 里的 `DSH-EXV-Theme-2.0.zip`，
+        而不是仓库的源码包（源码包不含 40 MB 的 `client.js`，装上去只有两个插件）。
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH 版本
+      description: 可在 DSH 的「设置 → 关于」查看，或运行 `powershell -c "(Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*','HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*' | Where-Object DisplayName -like '*DeepSeek Harness*').DisplayVersion"`
+      placeholder: 0.2.2-rc.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: 安装来源
+      options:
+        - Release 里的 DSH-EXV-Theme-2.0.zip
+        - 仓库源码自行构建（node tools/build-parallax.mjs）
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows 版本
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: 现象
+      description: 发生了什么、你期望什么。界面问题请附截图。
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开背景编辑
+        2. 切换到动态模式
+        3. …
+    validations:
+      required: false
+
+  - type: textarea
+    id: log
+    attributes:
+      label: install / uninstall 输出
+      description: 如果是安装问题，请把 `install.cmd` 窗口里的完整输出贴进来。
+      render: text
+    validations:
+      required: false
