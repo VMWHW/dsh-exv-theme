@@ -1,6 +1,6 @@
 {
   "name": "@local/flat-corners",
-  "version": "2.1.2",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "description": "Removes every corner radius from the DSH Web interface.",

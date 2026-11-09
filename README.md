@@ -88,7 +88,7 @@ node tools/build-parallax.mjs
 - **提示 DSH 版本不符**：安装器只验证过 `0.2.2-rc.1`。确认要继续，请手动加 `-Force`：
   `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -Force`
 - **安装中途失败**：安装器会自动回滚到安装前状态；profile 备份位于 `%USERPROFILE%\.dsh\profiles\desktop\package.json.pre-exv-*.bak`。
-- **从仓库下载的 ZIP 装不完整**：仓库 ZIP 不含 40 MB 的 `client.js`，请改用 [Releases](../../releases) 里的 `DSH-EXV-Theme-2.1.2.zip`。
+- **从仓库下载的 ZIP 装不完整**：仓库 ZIP 不含 40 MB 的 `client.js`，请改用 [Releases](../../releases) 里的 `DSH-EXV-Theme-2.2.0.zip`。
 
 ## 许可证与第三方组件
 
@@ -100,4 +100,4 @@ node tools/build-parallax.mjs
 
 有问题或建议请开 Issue，并尽量附上：DSH 版本、Windows 版本、使用的是 Release 包还是源码自建、以及 `install.ps1` 的完整输出。
 
-版本：2.1.2
+版本：2.2.0

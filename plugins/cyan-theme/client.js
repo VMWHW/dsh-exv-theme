@@ -393,11 +393,16 @@ const VV_OPTIONS = [
       '[class*="userStack"] [class*="bubble"] :where(*) { color: #000 !important; }',
       /* The composer card becomes transparent; its cyan hairline stays. */
       '[data-dsh-composer] { position: relative; background-color: rgba(0, 0, 0, 0.32) !important; backdrop-filter: blur(14px) saturate(1.1); outline: 1px solid rgba(0, 255, 240, 0.55) !important; outline-offset: -1px !important; }',
-      '[data-dsh-composer]:focus-within { outline-color: #00fff0 !important; box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.80), 0 0 26px rgba(0, 255, 240, 0.35) !important; }',
+      '[data-dsh-composer]:focus-within { outline-color: #00fff0 !important; box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.80), 0 0 26px rgba(0, 255, 240, 0.35); }',
       /* While the agent is running: scrolling hazard fill inset from the frame. */
       '@keyframes dsh-thinking-tape { from { background-position: 0 0; } to { background-position: 452.55px 0; } }',
       '[data-dsh-composer][data-dsh-thinking]::before { content: ""; position: absolute; inset: 6px; z-index: 9; pointer-events: none; background-image: repeating-linear-gradient(45deg, rgba(0, 255, 240, 0.30) 0 10px, rgba(0, 255, 240, 0.04) 10px 20px); background-size: 452.55px 100%; background-repeat: repeat; animation: dsh-thinking-tape 10s linear infinite; }',
       '@media (prefers-reduced-motion: reduce) { [data-dsh-composer][data-dsh-thinking]::before { animation: none; } }',
+      /* 2.2：思考时边框常亮 + 外侧呼吸泛光。直接动画 composer 自己的 box-shadow（只画外侧），
+         所以这条 box-shadow 不能带 !important——!important 会压过 CSS 动画。 */
+      '@keyframes dsh-thinking-ring { from { box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.70), 0 0 14px rgba(0, 255, 240, 0.14); } to { box-shadow: 0 0 0 1px rgba(0, 255, 240, 1), 0 0 36px rgba(0, 255, 240, 0.50); } }',
+      '[data-dsh-composer][data-dsh-thinking] { outline-color: #00fff0 !important; animation: dsh-thinking-ring 3.2s ease-in-out infinite alternate; }',
+      '@media (prefers-reduced-motion: reduce) { [data-dsh-composer][data-dsh-thinking] { animation: none; box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.90), 0 0 26px rgba(0, 255, 240, 0.35); } }',
       /* Send / stop keeps the theme fill and outline; layout is untouched. */
       '[data-dsh-composer] [class*="primary"] { background-color: rgba(0, 255, 240, 0.20) !important; color: #00fff0 !important; outline: 1px solid rgba(0, 255, 240, 0.85) !important; outline-offset: -1px !important; }',
       '[data-dsh-composer] [class*="primary"] svg { color: #00fff0 !important; }',
@@ -425,9 +430,17 @@ const VV_OPTIONS = [
       /* Right sidebar dock: frosted glass and a translucent code surface. */
       '[data-dsh-rightbar] { position: relative; isolation: isolate; background-color: rgba(0, 0, 0, 0.28) !important; --dsw-alias-markdown-code-block: rgba(0, 0, 0, 0.36) !important; }',
       '[data-dsh-rightbar]::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
+      /* 2.2：右侧边栏靠 translateX 滑入滑出，毛玻璃挂在滑动元素上会每帧重算背景模糊。
+         动画期间先不要 backdrop-filter，滑到位（transitionend）再打开；收起时元素已经移出视野，不用管。
+         属性由下面的 transition 监听写入。 */
+      '[data-dsh-rightbar][data-dsh-motion]::before { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }',
       /* Trajectory view: an opaque-enough backing for dense log text. */
       '[data-dsh-trajectory] { background: rgba(0, 0, 0, 0.55) !important; --dsw-alias-bg-layer-1: rgba(0, 0, 0, 0.35) !important; }',
       '[class*="tabActive"] { text-shadow: 0 0 12px rgba(0, 255, 240, 0.45); }',
+      /* 2.2：右侧边栏标签页常态重做。宿主选中态是 --dsw-alias-markdown-tag 的灰底，
+         像浏览器标签；这里换成主题的青底 + 1px 描边，hover 仍交给下面的全局实心青规则。 */
+      '[data-dsh-rightbar] [data-dockkit-tab][aria-selected="true"]:not(:hover) { background: rgba(0, 255, 240, 0.15) !important; color: #00fff0 !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.55), 0 0 14px rgba(0, 255, 240, 0.10) !important; }',
+      '[data-dsh-rightbar] [data-dockkit-tab][aria-selected="true"]:not(:hover) :where(*) { color: #00fff0 !important; }',
       '[class*="assistantVioletBright"] { color: #b98cff !important; background: rgba(150, 90, 255, 0.16) !important; }',
       /* Markdown code blocks: frosted glass with a cyan hairline. */
       '[data-code-wrap] { background-color: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.40) !important; }',
@@ -466,8 +479,15 @@ const VV_OPTIONS = [
       ':is(button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="treeitem"]):hover:not(:disabled):not([class*="brand"]) :where(*) { color: #000 !important; }',
       /* 快捷键速查：整行覆盖层是实心青色按钮，行内文字、键帽、操作图标一起转黑 */
       'li:has(> button:enabled:hover) :where(*) { color: #000 !important; }',
-      /* Brand logo: keep the colors, add a translucent cyan highlight. */
-      ':is(button, [role="button"])[class*="brand"]:hover { background-color: rgba(0, 255, 240, 0.14) !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.45), 0 0 18px rgba(0, 255, 240, 0.16) !important; }',
+      /* 2.2：插件管理页的插件行。悬停时整行直接实心青底黑字（和通用按钮高亮一致），
+         不再叠毛玻璃——宿主里那层按钮高亮优先级很深，索性整行统一成同一种高亮。
+         四个 data 属性叠加是为了压过全局 hover 的优先级。 */
+      '[data-plugin-row] { transition: background-color .14s ease; }',
+      '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover { background-color: #00fff0 !important; }',
+      '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :where(*) { color: #000 !important; }',
+      /* Brand logo: 2.2 去掉悬停时的方框描边，只保留一层很淡的高亮和柔光。
+         之前的 inset 1px 会贴着 logo 画出一个方块，用户要求不要。 */
+      ':is(button, [role="button"])[class*="brand"]:hover { background-color: rgba(0, 255, 240, 0.12) !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.14) !important; }',
       /* Sidebar account chip: keep the solid highlight, add a large glow. */
       '[class*="_5Qcc8a_trigger"] { transition: background-color .25s ease, box-shadow .25s ease, color .25s ease; }',
       '[class*="_5Qcc8a_trigger"][class*="_5Qcc8a_trigger"]:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.95), 0 0 26px rgba(0, 255, 240, 0.90), 0 0 64px rgba(0, 255, 240, 0.45) !important; }',
@@ -480,7 +500,8 @@ const VV_OPTIONS = [
          button, so the global solid-cyan hover would flood the whole strip. */
       '[data-testid="todo-panel"] { background: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(0, 255, 240, 0.35) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.10) !important; }',
       '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"] { background: transparent !important; color: rgba(0, 255, 240, 0.86) !important; }',
-      '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"]:hover:not(:disabled) { background: rgba(0, 255, 240, 0.10) !important; color: #00fff0 !important; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.28) !important; }',
+      /* 悬停只留一层淡色底，不再加 inset 1px——否则会和面板描边叠成两个框 */
+      '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"]:hover:not(:disabled) { background: rgba(0, 255, 240, 0.10) !important; color: #00fff0 !important; box-shadow: none !important; }',
       '[data-testid="todo-panel"] > div > button[aria-expanded][type="button"]:hover:not(:disabled) :where(*) { color: #00fff0 !important; }',
       '[data-testid="todo-panel"] [class*="DXuOLW_title"] { color: #00fff0 !important; }',
       '[data-testid="todo-panel"] [class*="DXuOLW_progress"], [data-testid="todo-panel"] [class*="DXuOLW_lead"], [data-testid="todo-panel"] [class*="DXuOLW_chevron"] { color: rgba(0, 255, 240, 0.64) !important; }',
@@ -583,6 +604,20 @@ const VV_OPTIONS = [
       '.dsh-widget-balance.is-spending .dsh-dot { background: #000; box-shadow: none; }',
       '.dsh-widget-balance.is-spending .dsh-colon::before, .dsh-widget-balance.is-spending .dsh-colon::after { background: #000; box-shadow: none; }',
       '.dsh-widget-balance.is-spending .dsh-widget-value { color: #000; }',
+      /* 2.2：时钟和余额 / 峰谷共用同一张卡片，边框显式钉成 2px，防止被后续规则带偏 */
+      '.dsh-widget-clock { border-width: 2px; }',
+      /* 2.2：余额卡底部一行——本金 / 赠金明细，右边接预测速率和涨跌三角。
+         标题保持居中，速率不再占用标题行。 */
+      '.dsh-widget-detail { display: flex; align-items: center; gap: 10px; font-size: 11px; letter-spacing: 0.06em; color: rgba(0, 255, 240, 0.55); white-space: nowrap; }',
+      '.dsh-widget-detail b { font-weight: 400; color: rgba(0, 255, 240, 0.88); font-variant-numeric: tabular-nums; }',
+      '.dsh-widget-trend { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; letter-spacing: 0.04em; color: rgba(0, 255, 240, 0.78); font-variant-numeric: tabular-nums; white-space: nowrap; }',
+      '.dsh-widget-trend[data-up="1"] { color: #00fff0; }',
+      '.dsh-widget-arrow { display: block; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; }',
+      '.dsh-widget-arrow[data-dir="down"] { border-top: 6px solid #00fff0; }',
+      '.dsh-widget-arrow[data-dir="up"] { border-bottom: 6px solid #00fff0; }',
+      '.dsh-widget-balance.is-spending .dsh-widget-detail, .dsh-widget-balance.is-spending .dsh-widget-detail b, .dsh-widget-balance.is-spending .dsh-widget-trend { color: #000 !important; text-shadow: none; }',
+      '.dsh-widget-balance.is-spending .dsh-widget-arrow[data-dir="down"] { border-top-color: #000; }',
+      '.dsh-widget-balance.is-spending .dsh-widget-arrow[data-dir="up"] { border-bottom-color: #000; }',
       '.dsh-widget-title { font-size: 13px; letter-spacing: 0.3em; color: rgba(0, 255, 240, 0.80); }',
       '.dsh-seven { display: flex; align-items: center; gap: 3px; }',
       '.dsh-seg { width: 22px; height: 36px; display: block; }',
@@ -604,12 +639,17 @@ const VV_OPTIONS = [
       '.dsh-widget-status[data-peak="1"] { background-color: rgba(0, 255, 240, 0.15); border-color: rgba(0, 255, 240, 0.90); box-shadow: 0 0 22px rgba(0, 255, 240, 0.28), inset 0 0 24px rgba(0, 255, 240, 0.10); }',
       '.dsh-widget-status[data-peak="1"] .dsh-widget-title { color: #00fff0; }',
       '.dsh-widget-status[data-peak="1"] .dsh-widget-status-next { color: rgba(0, 255, 240, 0.72); }',
+      /* 2.2 极简模式：去掉标题，卡片收到只剩一行状态 */
+      '.dsh-widget-status-min { min-height: 0; padding: 5px 10px; gap: 0; }',
+      '.dsh-widget-status-min .dsh-widget-status-row { gap: 7px; }',
+      '.dsh-widget-status-min .dsh-widget-status-now { font-size: 13px; letter-spacing: 0.16em; }',
+      '.dsh-widget-status-min .dsh-widget-status-price { font-size: 8px; line-height: 11px; padding: 0 3px; }',
       '.dsh-widget-date { width: 100%; justify-content: space-between; gap: 0; opacity: 0.72; }',
       '.dsh-widget-date .dsh-seg { width: 11px; height: 18px; }',
       '.dsh-widget-date .dsh-date-space { flex: 0 0 4px; }',
       '.dsh-widget-value { font-size: 24px; color: #00fff0; }',
       '.dsh-widget-edit { position: absolute; inset: 0; box-sizing: border-box; display: flex; align-items: center; justify-content: center; background: repeating-linear-gradient(45deg, rgba(0, 255, 240, 0.55) 0 8px, rgba(0, 255, 240, 0.10) 8px 16px); border: 2px solid rgba(0, 255, 240, 1); box-shadow: 0 0 22px rgba(0, 255, 240, 0.45); }',
-      '.dsh-widget-name { padding: 3px 12px; background: rgba(0, 0, 0, 0.88); color: #00fff0; font-size: 12px; letter-spacing: 0.25em; border: 1px solid rgba(0, 255, 240, 0.50); }',
+      '.dsh-widget-name { padding: 3px 12px; background: rgba(0, 0, 0, 0.88); color: #00fff0; font-size: 12px; letter-spacing: 0.25em; border: 1px solid rgba(0, 255, 240, 0.50); white-space: nowrap; }',
       '.dsh-widget-close { position: absolute; top: 0; right: 0; z-index: 5; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 0, 0, 0.90); border: 1px solid rgba(0, 255, 240, 0.70); color: #00fff0 !important; font-size: 13px; line-height: 1; cursor: pointer; }',
       '.dsh-widget-close:hover { background: #00fff0 !important; color: #000 !important; }',
       '.dsh-widget-reset { position: absolute; top: 0; left: 0; z-index: 6; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 0, 0, 0.90); border: 1px solid rgba(0, 255, 240, 0.70); color: #00fff0 !important; cursor: pointer; }',
@@ -622,6 +662,15 @@ const VV_OPTIONS = [
       '.dsh-widget-list-row[data-hidden] { color: rgba(0, 255, 240, 0.42) !important; }',
       '.dsh-widget-list-dot { flex: none; width: 9px; height: 9px; background: #00fff0; box-shadow: 0 0 8px rgba(0, 255, 240, 0.55); }',
       '.dsh-widget-list-row[data-hidden] .dsh-widget-list-dot { background: transparent; box-shadow: inset 0 0 0 1px rgba(0, 255, 240, 0.45); }',
+      /* 2.2：组件列表里，带模式的组件悬停时在左侧弹出模式菜单（样式沿用母级列表） */
+      '.dsh-widget-list-row { position: relative; }',
+      '.dsh-widget-modes { position: absolute; right: calc(100% - 2px); top: -5px; z-index: 3; display: none; flex-direction: column; gap: 1px; min-width: 66px; padding: 4px; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); }',
+      /* 贴着母行（-2px 重叠），中间不留缝，鼠标从母行移到子菜单不会断开 hover */
+      '.dsh-widget-modes::before { content: ""; position: absolute; right: -10px; top: 0; bottom: 0; width: 10px; }',
+      '.dsh-widget-list-row:hover .dsh-widget-modes { display: flex; }',
+      '.dsh-widget-mode-row { padding: 5px 8px; font-size: 11px; letter-spacing: 0.08em; color: rgba(0, 255, 240, 0.72); cursor: pointer; user-select: none; }',
+      '.dsh-widget-mode-row:hover { background: rgba(0, 255, 240, 0.12); color: #00fff0; }',
+      '.dsh-widget-mode-row[data-active] { background: rgba(0, 255, 240, 0.10); color: #00fff0; box-shadow: inset 2px 0 0 #00fff0; }',
       /* Chat "back to bottom" button: frosted HUD square instead of the floating pill. */
       'button[class*="_toBottom"][class*="_toBottom"] { box-sizing: border-box; background: rgba(0, 0, 0, 0.58) !important; border: 1px solid rgba(0, 255, 240, 0.55) !important; color: #00fff0 !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.18) !important; }',
       'button[class*="_toBottom"][class*="_toBottom"]:hover:not(:disabled) { background: rgba(0, 255, 240, 0.16) !important; border-color: #00fff0 !important; color: #00fff0 !important; box-shadow: 0 0 20px rgba(0, 255, 240, 0.30) !important; }',
@@ -681,7 +730,7 @@ const VV_OPTIONS = [
       '.dsh-bg-reset[data-idle] { opacity: 0.35; }',
       '.dsh-bg-reset[data-idle]:hover { opacity: 1; }',
       /* 剪贴板组件：三个可拖动的小方块 */
-      '.dsh-clip-slot { display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 6px; box-sizing: border-box; background: rgba(0, 0, 0, 0.55) !important; border: 1px solid rgba(0, 255, 240, 0.58); pointer-events: auto; will-change: transform; }',
+      '.dsh-clip-slot { display: flex; flex-direction: column; gap: 5px; padding: 9px 10px 7px; box-sizing: border-box; background: rgba(0, 0, 0, 0.55) !important; border: 2px solid rgba(0, 255, 240, 0.58); pointer-events: auto; will-change: transform; }',
       '.dsh-clip-slot:hover { border-color: rgba(0, 255, 240, 0.78); box-shadow: 0 0 16px rgba(0, 255, 240, 0.18); }',
       /* 有内容时不再给“+”留位置，正文吃满剩余高度 */
       '.dsh-clip-slot[data-filled] .dsh-clip-body { flex: 1 1 auto; min-height: 0; max-height: none; }',
@@ -689,30 +738,30 @@ const VV_OPTIONS = [
       /* 编辑模式与其它组件统一：空槽只显示条纹占位，有内容只换成编辑态边框 */
       '.dsh-widget.is-editing.dsh-clip-slot[data-empty] { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }',
       '.dsh-widget.is-editing.dsh-clip-slot[data-filled] { border: 2px solid #00fff0; box-shadow: 0 0 22px rgba(0, 255, 240, 0.45); }',
-      '.dsh-clip-head { flex: none; font-size: 10px; letter-spacing: 0.22em; color: rgba(0, 255, 240, 0.72); }',
+      '.dsh-clip-head { flex: none; font-size: 11px; letter-spacing: 0.18em; color: rgba(0, 255, 240, 0.72); }',
       '.dsh-widget.is-editing.dsh-clip-slot .dsh-clip-head { padding-left: 20px; }',
-      '.dsh-clip-body { flex: 0 1 auto; min-height: 22px; max-height: 46%; overflow: hidden; font-size: 12px; line-height: 1.4; color: rgba(0, 255, 240, 0.94); white-space: pre-wrap; word-break: break-word; cursor: pointer; }',
+      '.dsh-clip-body { flex: 0 1 auto; min-height: 26px; max-height: 46%; overflow: hidden; font-size: 13px; line-height: 1.45; color: rgba(0, 255, 240, 0.94); white-space: pre-wrap; word-break: break-word; cursor: pointer; }',
       '.dsh-clip-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }',
       '.dsh-clip-image { display: block; max-width: 100%; max-height: 100%; object-fit: contain; }',
       '.dsh-clip-file { display: flex; align-items: center; gap: 6px; min-width: 0; }',
       '.dsh-clip-file-icon { flex: none; color: rgba(0, 255, 240, 0.82); }',
       '.dsh-clip-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
-      '.dsh-clip-plus { flex: 1 1 auto; min-height: 22px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 255, 240, 0.06); border: 1px dashed rgba(0, 255, 240, 0.45); color: rgba(0, 255, 240, 0.80) !important; font-size: 20px; line-height: 1; cursor: pointer; }',
+      '.dsh-clip-plus { flex: 1 1 auto; min-height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 255, 240, 0.06); border: 1px dashed rgba(0, 255, 240, 0.45); color: rgba(0, 255, 240, 0.80) !important; font-size: 22px; line-height: 1; cursor: pointer; }',
       '.dsh-clip-plus:hover { background: rgba(0, 255, 240, 0.16); border-color: rgba(0, 255, 240, 0.75); color: #00fff0 !important; }',
       '.dsh-clip-bar { flex: none; display: flex; gap: 4px; }',
       /* 三个按钮默认只显示图标，悬停才展开文字 */
-      '.dsh-clip-btn { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 3px 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.42); color: rgba(0, 255, 240, 0.92) !important; font-size: 10px; line-height: 1; cursor: pointer; transition: background-color .14s ease, flex-grow .16s ease; }',
-      '.dsh-clip-btn svg { flex: none; display: block; width: 11px; height: 11px; }',
+      '.dsh-clip-btn { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 4px 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.42); color: rgba(0, 255, 240, 0.92) !important; font-size: 11px; line-height: 1; cursor: pointer; transition: background-color .14s ease, flex-grow .16s ease; }',
+      '.dsh-clip-btn svg { flex: none; display: block; width: 12px; height: 12px; }',
       '.dsh-clip-btn-text { display: block; max-width: 0; opacity: 0; overflow: hidden; white-space: nowrap; transition: max-width .16s ease, opacity .14s ease; }',
       '.dsh-clip-btn:hover { flex-grow: 2.4; background: rgba(0, 255, 240, 0.18); color: #00fff0 !important; }',
-      '.dsh-clip-btn:hover .dsh-clip-btn-text { max-width: 64px; opacity: 1; }',
+      '.dsh-clip-btn:hover .dsh-clip-btn-text { max-width: 70px; opacity: 1; }',
       /* 缩放把手：实心三角，比原来的渐变线条更醒目 */
       '.dsh-clip-resize, .dsh-widget-resize { position: absolute; right: 0; bottom: 0; z-index: 3; width: 16px; height: 16px; cursor: nwse-resize; background: #00fff0; clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: 0.85; }',
       '.dsh-clip-resize:hover, .dsh-widget-resize:hover { background: #ffffff; opacity: 1; }',
-      '.dsh-clip-hint { flex: 1 1 auto; min-height: 22px; display: flex; align-items: center; justify-content: center; padding: 0 4px; background: rgba(0, 255, 240, 0.12); border: 1px dashed rgba(0, 255, 240, 0.78); color: #00fff0 !important; font-size: 11px; letter-spacing: 0.06em; }',
+      '.dsh-clip-hint { flex: 1 1 auto; min-height: 28px; display: flex; align-items: center; justify-content: center; padding: 0 4px; background: rgba(0, 255, 240, 0.12); border: 1px dashed rgba(0, 255, 240, 0.78); color: #00fff0 !important; font-size: 12px; letter-spacing: 0.06em; }',
       '.dsh-clip-slot[data-armed] { border-color: #00fff0; box-shadow: 0 0 18px rgba(0, 255, 240, 0.35); }',
-      '.dsh-clip-notice { position: absolute; right: 6px; top: 6px; font-size: 10px; color: #00fff0; text-shadow: 0 0 8px rgba(0, 255, 240, 0.5); }',
-      '.dsh-clip-chip { box-sizing: border-box; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(0, 255, 240, 0.80) !important; background: rgba(0, 255, 240, 0.14); border: 1px solid rgba(0, 255, 240, 0.40); pointer-events: auto; cursor: pointer; transition: background-color .12s ease, color .12s ease; }',
+      '.dsh-clip-notice { position: absolute; right: 6px; top: 6px; font-size: 11px; color: #00fff0; text-shadow: 0 0 8px rgba(0, 255, 240, 0.5); }',
+      '.dsh-clip-chip { box-sizing: border-box; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 12px; color: rgba(0, 255, 240, 0.80) !important; background: rgba(0, 255, 240, 0.14); border: 1px solid rgba(0, 255, 240, 0.40); pointer-events: auto; cursor: pointer; transition: background-color .12s ease, color .12s ease; }',
       '.dsh-clip-chip[data-filled] { background: rgba(0, 255, 240, 0.30); color: #00fff0 !important; }',
       '.dsh-clip-chip:hover { background: #00fff0; color: #000 !important; border-color: #00fff0; }',
       /* 剪贴板面板 */
@@ -869,6 +918,14 @@ const VV_OPTIONS = [
       if (!Number.isFinite(number)) return null;
       const text = number.toFixed(2);
       return text.length > 9 ? number.toFixed(0) : text;
+    };
+
+    /* 2.2：消耗速率。余额按 10 秒轮询，用最近 45 秒内的首尾样本估每秒下降；
+       长时间没变化就自然回到 0。低于 0.01 时多给一位小数，否则只会显示 -0.00/s。 */
+    const formatBurnRate = (rate) => {
+      if (!Number.isFinite(rate) || rate <= 0.0005) return '0.00/s';
+      const digits = rate >= 0.01 ? 2 : 3;
+      return '-' + rate.toFixed(digits) + '/s';
     };
 
     /**
@@ -1726,12 +1783,38 @@ const VV_OPTIONS = [
 
     const WIDGET_REGISTRY = [
       { id: 'balance', label: '余额', storageKey: 'dsh-widget-balance-ratio', defaultRatio: { rx: 0.14, ry: 0.16 } },
-      { id: 'status', label: '峰谷状态', storageKey: 'dsh-widget-status-ratio', defaultRatio: { rx: 0.14, ry: 0.30 } },
+      { id: 'status', label: '峰谷状态', editLabel: '峰谷', storageKey: 'dsh-widget-status-ratio', defaultRatio: { rx: 0.14, ry: 0.30 } },
       { id: 'clock', label: '时钟', storageKey: 'dsh-widget-clock-ratio', defaultRatio: { rx: 0.14, ry: 0.44 } },
       { id: 'clip-1', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-1-ratio', defaultRatio: { rx: 0.885, ry: 0.58 } },
       { id: 'clip-2', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-2-ratio', defaultRatio: { rx: 0.885, ry: 0.68 } },
       { id: 'clip-3', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-3-ratio', defaultRatio: { rx: 0.885, ry: 0.78 } },
     ];
+
+    /* 2.2：有多模式的组件。组件编辑列表里悬停该行时，左侧弹出模式子菜单。 */
+    const WIDGET_MODE_KEY = 'dsh-exv-widget-modes.v1';
+    const WIDGET_MODES = {
+      status: {
+        defaultMode: 'full',
+        options: [
+          { id: 'full', label: '完整' },
+          { id: 'minimal', label: '极简' },
+        ],
+      },
+    };
+    const readWidgetModes = () => {
+      const modes = {};
+      let stored = null;
+      try {
+        stored = JSON.parse(window.localStorage.getItem(WIDGET_MODE_KEY) || 'null');
+      } catch (error) {
+        stored = null;
+      }
+      for (const [id, definition] of Object.entries(WIDGET_MODES)) {
+        const value = stored && typeof stored === 'object' ? stored[id] : null;
+        modes[id] = definition.options.some((option) => option.id === value) ? value : definition.defaultMode;
+      }
+      return modes;
+    };
     const WIDGET_HIDDEN_KEY = 'dsh-widget-hidden';
     /* 高峰：北京时间工作日 09:00–12:00、14:00–18:00；其余为空闲（半价）。
        工作日 = 周一至周五非法定节假日，外加国务院调休上班的周末。 */
@@ -1830,31 +1913,38 @@ const VV_OPTIONS = [
         h(SevenNumber, { text: clockSnapshot(now), currency: false }),
         h(SevenNumber, { text: dateSnapshot(now), currency: false, className: 'dsh-widget-date' }));
     }
-    function LiveStatus({ editing }) {
+    /* 峰谷状态：完整模式 = 状态 + 下一状态 + 倒计时数字；极简模式只保留峰谷状态本身。 */
+    function LiveStatus({ editing, mode }) {
       const now = useNowTick();
       const peak = peakSnapshot(now);
+      const minimal = mode === 'minimal';
       return h('div', {
-        className: 'dsh-widget-balance dsh-widget-status',
+        className: 'dsh-widget-balance dsh-widget-status' + (minimal ? ' dsh-widget-status-min' : ''),
         'data-peak': peak.peak ? '1' : '0',
+        'data-mode': minimal ? 'minimal' : 'full',
         style: editing ? { visibility: 'hidden' } : undefined,
       },
-        h('div', { className: 'dsh-widget-title' }, 'STATUS / 状态'),
+        minimal ? null : h('div', { className: 'dsh-widget-title' }, 'STATUS / 状态'),
         h('div', { className: 'dsh-widget-status-row' },
           h('span', { className: 'dsh-widget-status-now', 'data-state': peak.peak ? 'peak' : 'off' }, peak.peak ? '高峰' : '空闲'),
           !peak.peak ? h('span', { className: 'dsh-widget-status-price' }, '半价') : null,
-          h('span', { className: 'dsh-widget-status-next' }, '下一状态 ' + peak.nextLabel)),
-        h(SevenNumber, { text: peak.countdown, currency: false }));
+          minimal ? null : h('span', { className: 'dsh-widget-status-next' }, '下一状态 ' + peak.nextLabel)),
+        minimal ? null : h(SevenNumber, { text: peak.countdown, currency: false }));
     }
 
     /* 余额：数字从最低位开始逐位滚到新值；下降时整块底闪成主题色，
-       停手 1s 后还原。位宽变化（9.99 → 10.00）直接换值，避免观感错乱。 */
-    function BalanceBody({ text, editing }) {
+       停手 1s 后还原。位宽变化（9.99 → 10.00）直接换值，避免观感错乱。
+       2.2：下方一行是本金 / 赠金明细，右边接预测速率；速率为正时右侧挂向下三角；
+       余额上涨（充值/赠金到账）时先挂向上三角，等数码管滚到实际金额再收起。 */
+    function BalanceBody({ text, detail, rateText, rateActive, editing }) {
       const target = text === null || text === undefined ? '' : String(text);
       const [shown, setShown] = React.useState(target);
       const shownRef = React.useRef(target);
       const timers = React.useRef([]);
       const spendTimer = React.useRef(0);
+      const upTimer = React.useRef(0);
       const [spending, setSpending] = React.useState(false);
+      const [trendUp, setTrendUp] = React.useState(false);
       React.useEffect(() => {
         const current = shownRef.current;
         if (!target || target === current) {
@@ -1867,7 +1957,9 @@ const VV_OPTIONS = [
         window.clearTimeout(spendTimer.current);
         const oldValue = Number(current);
         const newValue = Number(target);
-        const decreasing = Number.isFinite(oldValue) && Number.isFinite(newValue) && newValue < oldValue;
+        const hasOld = current !== '' && Number.isFinite(oldValue);
+        const decreasing = hasOld && Number.isFinite(newValue) && newValue < oldValue;
+        const increasing = hasOld && Number.isFinite(newValue) && newValue > oldValue;
         let changed = 0;
         for (let index = 0; index < target.length; index += 1) {
           if (current[index] !== target[index]) changed += 1;
@@ -1897,18 +1989,43 @@ const VV_OPTIONS = [
         } else {
           setSpending(false);
         }
+        if (increasing) {
+          /* 到账：向上三角一直挂到数码管滚完为止 */
+          window.clearTimeout(upTimer.current);
+          setTrendUp(true);
+          const rollMs = rollable ? 80 + Math.max(0, changed - 1) * 80 + 200 : 600;
+          upTimer.current = window.setTimeout(() => setTrendUp(false), rollMs);
+        } else if (decreasing) {
+          window.clearTimeout(upTimer.current);
+          setTrendUp(false);
+        }
         return undefined;
       }, [target]);
       React.useEffect(() => () => {
         timers.current.forEach((id) => window.clearTimeout(id));
         window.clearTimeout(spendTimer.current);
+        window.clearTimeout(upTimer.current);
       }, []);
+      const showArrow = trendUp || rateActive;
       return h('div', {
         className: spending ? 'dsh-widget-balance is-spending' : 'dsh-widget-balance',
         style: editing ? { visibility: 'hidden' } : undefined,
       },
         h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
-        shown === '' ? h('div', { className: 'dsh-widget-value' }, '--') : h(SevenNumber, { text: shown }));
+        shown === '' ? h('div', { className: 'dsh-widget-value' }, '--') : h(SevenNumber, { text: shown }),
+        Array.isArray(detail) && detail.length
+          ? h('div', { className: 'dsh-widget-detail' },
+            detail.map((entry) => h('span', { key: entry.label },
+              entry.label + ' ',
+              h('b', null, entry.value))),
+            rateText
+              ? h('span', { className: 'dsh-widget-trend', 'data-up': trendUp ? '1' : '0' },
+                rateText,
+                showArrow
+                  ? h('span', { className: 'dsh-widget-arrow', 'data-dir': trendUp ? 'up' : 'down' })
+                  : null)
+              : null)
+          : null);
     }
 
     function ThemeEnhancer() {
@@ -1980,7 +2097,9 @@ const VV_OPTIONS = [
       });
       const positionsRef = React.useRef(positions);
       positionsRef.current = positions;
-      const [balance, setBalance] = React.useState(null);
+      const [wallet, setWallet] = React.useState(null);
+      const [burnRate, setBurnRate] = React.useState(0);
+      const walletSamplesRef = React.useRef([]);
       const [balanceError, setBalanceError] = React.useState(null);
       const [hiddenWidgets, setHiddenWidgets] = React.useState(() => {
         try {
@@ -2012,6 +2131,17 @@ const VV_OPTIONS = [
           if (hidden) return previous.indexOf(id) >= 0 ? previous : [...previous, id];
           return previous.filter((item) => item !== id);
         });
+      };
+      const [widgetModes, setWidgetModes] = React.useState(readWidgetModes);
+      React.useEffect(() => {
+        try {
+          window.localStorage.setItem(WIDGET_MODE_KEY, JSON.stringify(widgetModes));
+        } catch (error) {
+          /* ignore persistence errors */
+        }
+      }, [widgetModes]);
+      const setWidgetMode = (id, mode) => {
+        setWidgetModes((previous) => (previous[id] === mode ? previous : { ...previous, [id]: mode }));
       };
 
       /* ---- 剪贴板组件状态 ---------------------------------------------- */
@@ -2389,6 +2519,36 @@ const VV_OPTIONS = [
         let timer = 0;
         let resizeObserver = null;
         let observedCard = null;
+        /* 右侧边栏拖左边界缩放时也先关毛玻璃：ResizeObserver 每次尺寸变化续一次，
+           停手 220ms 才算稳定，再把 data-dsh-motion 摘掉。 */
+        let motionObserver = null;
+        let observedRightbar = null;
+        let motionTimer = 0;
+        let motionHoldUntil = 0;
+
+        const observeRightbar = (el) => {
+          if (typeof ResizeObserver === 'undefined') return;
+          if (observedRightbar === el) return;
+          if (motionObserver) motionObserver.disconnect();
+          observedRightbar = el;
+          if (!motionObserver) {
+            motionObserver = new ResizeObserver(() => {
+              const target = rightbarEl;
+              if (!target) return;
+              motionHoldUntil = Date.now() + 220;
+              target.setAttribute('data-dsh-motion', '');
+              window.clearTimeout(motionTimer);
+              motionTimer = window.setTimeout(() => {
+                if (!target.isConnected || rightbarEl !== target) return;
+                motionHoldUntil = 0;
+                if (window.getComputedStyle(target).transform === 'none') {
+                  target.removeAttribute('data-dsh-motion');
+                }
+              }, 220);
+            });
+          }
+          if (el) motionObserver.observe(el);
+        };
 
         const observeComposer = (el) => {
           if (!resizeObserver) return;
@@ -2486,9 +2646,22 @@ const VV_OPTIONS = [
             if (!best || rect.left > best.rect.left) best = { host, rect };
           }
           const next = best ? best.host : null;
-          if (rightbarEl && rightbarEl !== next) rightbarEl.removeAttribute('data-dsh-rightbar');
+          if (rightbarEl && rightbarEl !== next) {
+            rightbarEl.removeAttribute('data-dsh-rightbar');
+            rightbarEl.removeAttribute('data-dsh-motion');
+          }
           rightbarEl = next;
-          if (rightbarEl) rightbarEl.setAttribute('data-dsh-rightbar', '');
+          observeRightbar(rightbarEl);
+          if (rightbarEl) {
+            rightbarEl.setAttribute('data-dsh-rightbar', '');
+            /* 兜底：万一 transitionend 没等到，停稳后也要把毛玻璃挂回去。
+               拖拽缩放期间由 motionHoldUntil 挡住，避免和 ResizeObserver 抢。 */
+            if (rightbarEl.hasAttribute('data-dsh-motion')
+              && Date.now() > motionHoldUntil
+              && window.getComputedStyle(rightbarEl).transform === 'none') {
+              rightbarEl.removeAttribute('data-dsh-motion');
+            }
+          }
         };
 
         const placeTrajectory = () => {
@@ -2554,11 +2727,65 @@ const VV_OPTIONS = [
           window.removeEventListener('resize', onResize);
           window.clearInterval(interval);
           window.clearTimeout(timer);
+          window.clearTimeout(motionTimer);
           if (resizeObserver) resizeObserver.disconnect();
+          if (motionObserver) motionObserver.disconnect();
           if (composerCard) composerCard.removeAttribute('data-dsh-composer');
           if (sidebarEl) sidebarEl.removeAttribute('data-dsh-sidebar');
           if (rightbarEl) rightbarEl.removeAttribute('data-dsh-rightbar');
           if (trajectoryEl) trajectoryEl.removeAttribute('data-dsh-trajectory');
+        };
+      }, []);
+
+      /* 2.2：右侧边栏滑入滑出期间先关掉毛玻璃（data-dsh-motion），停稳后再挂回去。
+         宿主用 transform 过渡（--ds-transition-duration-slow），所以直接听 transition 事件，
+         不依赖宿主的开合状态属性，也不改它的 DOM 结构。 */
+      React.useEffect(() => {
+        let settleTimer = 0;
+        let watchedEl = null;
+        /* 只有右侧边栏本体（theme 打的 data-dsh-rightbar）自己的 transform 过渡才算；
+           侧栏内部卡片的 hover 动画不打断毛玻璃。 */
+        const targetOf = (event) => {
+          if (!event || event.propertyName !== 'transform') return null;
+          const node = event.target;
+          if (!node || typeof node.hasAttribute !== 'function' || !node.hasAttribute('data-dsh-rightbar')) return null;
+          return node;
+        };
+        const settle = () => {
+          const el = watchedEl;
+          if (!el) return;
+          window.clearTimeout(settleTimer);
+          settleTimer = window.setTimeout(() => {
+            if (!el.isConnected) return;
+            /* 到位（transform:none）或已经滑出视野，才算真正停稳 */
+            const style = window.getComputedStyle(el);
+            const rect = el.getBoundingClientRect();
+            if (style.transform === 'none' || rect.left >= window.innerWidth - 1) {
+              el.removeAttribute('data-dsh-motion');
+            }
+          }, 40);
+        };
+        const onStart = (event) => {
+          const el = targetOf(event);
+          if (!el) return;
+          watchedEl = el;
+          window.clearTimeout(settleTimer);
+          el.setAttribute('data-dsh-motion', '');
+        };
+        const onEnd = (event) => {
+          const el = targetOf(event);
+          if (!el) return;
+          watchedEl = el;
+          settle();
+        };
+        document.addEventListener('transitionstart', onStart, true);
+        document.addEventListener('transitionend', onEnd, true);
+        document.addEventListener('transitioncancel', onEnd, true);
+        return () => {
+          window.clearTimeout(settleTimer);
+          document.removeEventListener('transitionstart', onStart, true);
+          document.removeEventListener('transitionend', onEnd, true);
+          document.removeEventListener('transitioncancel', onEnd, true);
         };
       }, []);
 
@@ -2604,10 +2831,38 @@ const VV_OPTIONS = [
               return;
             }
             const wallets = result.value.value || [];
-            const wallet = wallets.find((item) => item.currency === 'CNY') || wallets[0];
-            if (wallet) {
-              setBalance(wallet.balance);
+            const bonusWallets = result.value.bonusWallets || [];
+            const walletEntry = wallets.find((item) => item.currency === 'CNY') || wallets[0];
+            if (walletEntry) {
+              const rechargeValue = Number(walletEntry.balance);
+              const bonusEntry = bonusWallets.find((item) => item.currency === walletEntry.currency);
+              const bonusValue = bonusEntry ? Number(bonusEntry.balance) : 0;
+              const recharge = Number.isFinite(rechargeValue) ? rechargeValue : 0;
+              const bonus = Number.isFinite(bonusValue) ? bonusValue : 0;
+              const total = recharge + bonus;
+              setWallet({ currency: walletEntry.currency, recharge, bonus, total });
               setBalanceError(null);
+              /* 速率样本：每次成功轮询记一个总余额；只保留最近 45 秒，最多 30 个。
+                 取最近一次“确实下降了”的样本对，跨度不足 3 秒（连续补拉）就跳过。 */
+              const samples = walletSamplesRef.current;
+              const now = Date.now();
+              /* 最小化 / 长时间没轮询：旧样本作废，避免拿十几分钟前的余额算速率 */
+              if (samples.length && now - samples[samples.length - 1].t > 60000) samples.length = 0;
+              samples.push({ t: now, total });
+              while (samples.length > 30) samples.shift();
+              while (samples.length > 2 && samples[0].t < now - 45000) samples.shift();
+              let rate = 0;
+              const last = samples[samples.length - 1];
+              for (let index = samples.length - 2; index >= 0; index -= 1) {
+                const base = samples[index];
+                const seconds = (last.t - base.t) / 1000;
+                if (seconds < 3) continue;
+                if (base.total > last.total) {
+                  rate = (base.total - last.total) / seconds;
+                  break;
+                }
+              }
+              setBurnRate(rate);
             }
           }).catch(() => {
             if (alive) setBalanceError('network');
@@ -2832,7 +3087,16 @@ const VV_OPTIONS = [
         };
       }, [editing]);
 
-      const balanceText = formatBalance(balance);
+      const balanceText = wallet ? formatBalance(wallet.total) : null;
+      const balanceDetail = wallet
+        ? [
+          { label: '本金', value: wallet.recharge.toFixed(2) },
+          ...(wallet.bonus > 0 ? [{ label: '赠金', value: wallet.bonus.toFixed(2) }] : []),
+        ]
+        : null;
+      const burnRateText = wallet ? formatBurnRate(burnRate) : '';
+      /* 只有真的显示成非 -0.00 的速率才挂向下三角，和数字保持一致 */
+      const burnRateActive = burnRateText !== '' && burnRateText !== '0.00/s';
       const TOOL_H = 102;
       /* Keep clear of the window scrollbar: 8px overlapped the thumb's lane. */
       const TOOL_EDGE = 20;
@@ -2906,7 +3170,28 @@ const VV_OPTIONS = [
                   },
                 },
                   h('span', null, item.label),
-                  h('span', { className: 'dsh-widget-list-dot', 'aria-hidden': 'true' })
+                  h('span', { className: 'dsh-widget-list-dot', 'aria-hidden': 'true' }),
+                  WIDGET_MODES[item.id]
+                    ? h('div', {
+                      className: 'dsh-widget-modes',
+                      'data-owner': item.id,
+                      role: 'menu',
+                      'aria-label': item.label + ' 模式',
+                      onClick: (event) => event.stopPropagation(),
+                    },
+                      WIDGET_MODES[item.id].options.map((option) => h('div', {
+                        key: option.id,
+                        className: 'dsh-widget-mode-row',
+                        'data-active': widgetModes[item.id] === option.id ? '' : undefined,
+                        role: 'menuitemradio',
+                        'aria-checked': widgetModes[item.id] === option.id ? 'true' : 'false',
+                        title: item.label + '：' + option.label,
+                        onClick: (event) => {
+                          event.stopPropagation();
+                          setWidgetMode(item.id, option.id);
+                        },
+                      }, option.label)))
+                    : null
                 );
               })
           ) : null,
@@ -3084,13 +3369,21 @@ const VV_OPTIONS = [
           );
         }
         const body = item.id === 'balance'
-          ? h(BalanceBody, { text: balanceText, editing })
+          ? h(BalanceBody, {
+            text: balanceText,
+            detail: balanceDetail,
+            rateText: burnRateText,
+            rateActive: burnRateActive,
+            editing,
+          })
           : item.id === 'status'
-            ? h(LiveStatus, { editing })
-            : h('div', { className: 'dsh-widget-balance', style: editing ? { visibility: 'hidden' } : undefined },
+            ? h(LiveStatus, { editing, mode: widgetModes.status || 'full' })
+            : h('div', { className: 'dsh-widget-balance dsh-widget-clock', style: editing ? { visibility: 'hidden' } : undefined },
                 h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
                 h(LiveClock));
         const widgetScale = widgetScales[item.id] || 1;
+        /* 极简峰谷：一行小卡，编辑态也不再给缩放把手和恢复大小按钮 */
+        const statusMinimal = item.id === 'status' && (widgetModes.status || 'full') === 'minimal';
         return h('div', {
           key: item.id,
           className: editing ? 'dsh-widget is-editing' : 'dsh-widget',
@@ -3098,7 +3391,7 @@ const VV_OPTIONS = [
           style: { left: `${x}px`, top: `${y}px`, willChange: 'transform' },
           title: item.id === 'balance' ? (balanceError || undefined) : undefined,
         },
-          editing ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
+          editing && !statusMinimal ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
             h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
               h('path', { d: 'M9.4 4.3A3.9 3.9 0 1 0 9.8 6.8', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }),
               h('path', { d: 'M9.7 1.7V4.5H6.9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }))) : null,
@@ -3114,9 +3407,9 @@ const VV_OPTIONS = [
             }, '×') : null,
             body,
             editing
-              ? h('div', { className: 'dsh-widget-edit' }, h('div', { className: 'dsh-widget-name' }, item.label))
+              ? h('div', { className: 'dsh-widget-edit' }, h('div', { className: 'dsh-widget-name' }, item.editLabel || item.label))
               : null,
-            editing
+            editing && !statusMinimal
               ? h('div', { className: 'dsh-widget-resize', 'data-widget-resize': '', title: '拖动缩放' })
               : null
           )
@@ -3383,6 +3676,16 @@ const VV_OPTIONS = [
             if (thinking) card.setAttribute('data-dsh-thinking', '');
             else card.removeAttribute('data-dsh-thinking');
           }
+          if (thinking !== wasThinking) {
+            /* 2.2：通知 parallax-bg 同步做背景网格的外侧照明（呼吸同频） */
+            try {
+              window.dispatchEvent(new CustomEvent('dsh-exv-thinking', {
+                detail: { thinking, at: performance.now() },
+              }));
+            } catch (error) {
+              /* ignore */
+            }
+          }
           if (wasThinking && !thinking) {
             try {
               window.dispatchEvent(new CustomEvent('dsh-exv-refresh-balance'));
@@ -3392,6 +3695,24 @@ const VV_OPTIONS = [
           }
           wasThinking = thinking;
         };
+        /* 每 2 秒的兜底扫描太慢，输入框边框要立刻亮；这里盯住 composer 子树，
+           停止/发送按钮一换就马上同步，rAF 合并同帧的多次变动。 */
+        let thinkingObserver = null;
+        let thinkingCard = null;
+        let thinkingFrame = 0;
+        const watchThinking = (card) => {
+          if (!card || thinkingCard === card) return;
+          if (thinkingObserver) thinkingObserver.disconnect();
+          thinkingCard = card;
+          thinkingObserver = new MutationObserver(() => {
+            if (thinkingFrame) return;
+            thinkingFrame = window.requestAnimationFrame(() => {
+              thinkingFrame = 0;
+              if (thinkingCard && thinkingCard.isConnected) syncThinking(thinkingCard);
+            });
+          });
+          thinkingObserver.observe(card, { childList: true, subtree: true });
+        };
         const markComposer = () => {
           const started = performance.now();
           try {
@@ -3399,6 +3720,7 @@ const VV_OPTIONS = [
                不再每秒重新量一遍 8 层父级的尺寸（那会强制同步布局）。 */
             const marked = document.querySelector('[data-dsh-composer]');
             if (marked && marked.isConnected && marked.querySelector('[contenteditable="true"]')) {
+              watchThinking(marked);
               syncThinking(marked);
               return;
             }
@@ -3421,6 +3743,7 @@ const VV_OPTIONS = [
             }
             if (card) {
               card.setAttribute('data-dsh-composer', '');
+              watchThinking(card);
               syncThinking(card);
             }
           } catch (error) {
@@ -3440,7 +3763,11 @@ const VV_OPTIONS = [
             markComposer();
           }
         }, 2000);
-        ctx.effect(() => () => window.clearInterval(composerTimer));
+        ctx.effect(() => () => {
+          window.clearInterval(composerTimer);
+          window.cancelAnimationFrame(thinkingFrame);
+          if (thinkingObserver) thinkingObserver.disconnect();
+        });
         ctx.slots.inject('shell.overlay', () => ctx.slots.register({
           name: 'shell.overlay', id: 'cyan-theme', order: 0,
         }, WidgetBoundary));

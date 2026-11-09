@@ -330,6 +330,20 @@ const THEME_DEFAULTS = {
       const waves = [];
       const pointer = { x: -10000, y: -10000 };
       let pressing = false;
+      /* 2.2：composer 思考时的外侧网格照明。cyan-theme 用 dsh-exv-thinking 事件同步，
+         另外每 600ms 兜底读一次 data-dsh-thinking 并缓存 composer 矩形。 */
+      let composerThinking = false;
+      let composerThinkingAt = 0;
+      let composerRect = null;
+      let composerProbeAt = 0;
+      const onThinking = (event) => {
+        const next = Boolean(event && event.detail && event.detail.thinking);
+        if (next === composerThinking) return;
+        composerThinking = next;
+        composerThinkingAt = performance.now();
+        composerRect = null;
+      };
+      window.addEventListener('dsh-exv-thinking', onThinking);
 
       const config = () => (getConfig ? getConfig() : null) || {};
       const pointerConfig = () => config().pointer || {};
@@ -895,6 +909,52 @@ const THEME_DEFAULTS = {
         }
       };
 
+      /* 思考泛光的网格照明：只照亮 composer 外侧，脉动和 CSS 的 3.2s 呼吸同频。
+         公式与 client.js 里的 dsh-thinking-ring 对齐（同一时刻起跳，视觉上同频）。 */
+      const drawComposerLight = (now) => {
+        if (now - composerProbeAt > 600) {
+          composerProbeAt = now;
+          const el = document.querySelector('[data-dsh-composer]');
+          const thinking = Boolean(el && el.hasAttribute('data-dsh-thinking'));
+          if (thinking !== composerThinking) {
+            composerThinking = thinking;
+            composerThinkingAt = now;
+          }
+          composerRect = el ? el.getBoundingClientRect() : null;
+        }
+        if (!composerThinking || !composerRect) return;
+        const rect = composerRect;
+        if (rect.width < 40 || rect.height < 20) return;
+        const bounds = canvas.getBoundingClientRect();
+        const left = rect.left - bounds.left;
+        const top = rect.top - bounds.top;
+        const right = left + rect.width;
+        const bottom = top + rect.height;
+        /* CSS 是 3.2s + alternate，一个完整呼吸来回是 6.4s；这里用同周期余弦对齐 */
+        const pulse = 0.5 - 0.5 * Math.cos(((now - composerThinkingAt) / 6400) * Math.PI * 2);
+        const reach = 46 + 86 * pulse;
+        const peak = 0.10 + 0.24 * pulse;
+        const minCol = Math.floor((left - reach) / STEP);
+        const maxCol = Math.ceil((right + reach) / STEP);
+        const minRow = Math.floor((top - reach) / STEP);
+        const maxRow = Math.ceil((bottom + reach) / STEP);
+        for (let col = minCol; col <= maxCol; col += 1) {
+          for (let row = minRow; row <= maxRow; row += 1) {
+            const x = 6 + col * STEP;
+            const y = row * STEP;
+            /* 卡片里面的格子不点亮：泛光只对外侧起效 */
+            if (x + CELL > left - 2 && x < right + 2 && y + CELL > top - 2 && y < bottom + 2) continue;
+            const cx = x + CELL / 2;
+            const cy = y + CELL / 2;
+            const dx = cx < left ? left - cx : cx > right ? cx - right : 0;
+            const dy = cy < top ? top - cy : cy > bottom ? cy - bottom : 0;
+            const distance = Math.hypot(dx, dy);
+            if (distance > reach) continue;
+            queueCell(col, row, peak * (1 - distance / reach));
+          }
+        }
+      };
+
       const draw = () => {
         context.clearRect(0, 0, width, height);
         const glow = headGlowSprite();
@@ -931,6 +991,7 @@ const THEME_DEFAULTS = {
         drawPointerLight();
         drawPointerPressLight();
         drawWidgetLight();
+        drawComposerLight(performance.now());
         flushLightCells();
         drawCharacterLight();
         drawWaves(performance.now());
@@ -1077,6 +1138,7 @@ const THEME_DEFAULTS = {
           window.removeEventListener('pointerup', onPointerUp);
           window.removeEventListener('pointercancel', onPointerUp);
           window.removeEventListener('blur', onPointerUp);
+          window.removeEventListener('dsh-exv-thinking', onThinking);
         },
         setEnabled(value) {
           enabled = Boolean(value);
@@ -1209,6 +1271,10 @@ const THEME_DEFAULTS = {
         eyeX: 0,
         eyeY: 0,
         eyeEnabled: true,
+        /* 2.2：待机时偶尔朝屏幕中心瞟一眼。lastMoveAt 记录最后一次指针活动，
+           glance 是这一次“看屏幕前的人”的短动作状态。 */
+        lastMoveAt: 0,
+        glance: { active: false, start: 0, dur: 0, x: 0, y: 0, nextAt: 0 },
       };
 
       /* Rewrite all file references to data URLs so the model loads without
@@ -1257,8 +1323,36 @@ const THEME_DEFAULTS = {
       };
 
       const applyEyeAndHead = (model) => {
-        const targetX = live2d.eyeEnabled ? live2d.focusX : 0;
-        const targetY = live2d.eyeEnabled ? live2d.focusY : 0;
+        const now = performance.now();
+        if (!live2d.lastMoveAt) live2d.lastMoveAt = now;
+        const glance = live2d.glance;
+        if (glance.active && now - glance.start >= glance.dur) {
+          glance.active = false;
+          glance.nextAt = now + 8000 + Math.random() * 8000;
+        } else if (!glance.active && !live2d.head.active
+          && now >= glance.nextAt && now - live2d.lastMoveAt > 7000) {
+          /* 鼠标安静 7 秒后，每隔 8–16 秒随机瞟一眼屏幕中心：像不经意看屏幕前的人一眼 */
+          glance.active = true;
+          glance.start = now;
+          glance.dur = 1100 + Math.random() * 1200;
+          glance.x = (Math.random() * 2 - 1) * 0.12;
+          glance.y = (Math.random() * 2 - 1) * 0.08;
+        }
+        let baseX = live2d.eyeEnabled ? live2d.focusX : 0;
+        let baseY = live2d.eyeEnabled ? live2d.focusY : 0;
+        if (glance.active) {
+          const progress = Math.min(1, Math.max(0, (now - glance.start) / glance.dur));
+          /* 前 22% 转过去，中间停住看一会儿，最后 32% 转回鼠标方向 */
+          const weight = progress < 0.22
+            ? progress / 0.22
+            : progress > 0.68
+              ? Math.max(0, (1 - progress) / 0.32)
+              : 1;
+          baseX = baseX * (1 - weight) + glance.x * weight;
+          baseY = baseY * (1 - weight) + glance.y * weight;
+        }
+        const targetX = baseX;
+        const targetY = baseY;
         live2d.eyeX += (targetX - live2d.eyeX) * 0.12;
         live2d.eyeY += (targetY - live2d.eyeY) * 0.12;
         live2d.head.x += (live2d.head.tx - live2d.head.x) * 0.18;
@@ -1560,6 +1654,11 @@ const THEME_DEFAULTS = {
 
       window.addEventListener('pointermove', (event) => {
         if (!live2d.loaded) return;
+        live2d.lastMoveAt = performance.now();
+        if (live2d.glance.active) {
+          live2d.glance.active = false;
+          live2d.glance.nextAt = live2d.lastMoveAt + 8000 + Math.random() * 8000;
+        }
         live2d.focusX = Math.max(-1, Math.min(1, (event.clientX / window.innerWidth) * 2 - 1));
         live2d.focusY = Math.max(-1, Math.min(1, (event.clientY / window.innerHeight) * 2 - 1));
         if (live2d.head.active) {
