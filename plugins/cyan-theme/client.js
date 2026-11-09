@@ -48,13 +48,15 @@ const THEME_DEFAULTS = {
         resolution: 1440,
         density: 100,
         speed: 100,
+        scanMode: '2d',
+        scanSpeed: 100,
         breathing: { enabled: true, amplitude: 12 },
       },
       logos: { preset: 'default', enabled: true, size: 150, breathing: { enabled: true, amplitude: 12 } },
       vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, breathing: { enabled: true, amplitude: 12 } },
       pointer: {
         light: { enabled: true, brightness: 100, radius: 60 },
-        ripple: { enabled: true, brightness: 100, radius: 550 },
+        ripple: { enabled: true, brightness: 100, radius: 550, mode: '2d', speed: 100 },
         press: { enabled: true, strength: 100 },
       },
     };
@@ -64,6 +66,8 @@ const THEME_DEFAULTS = {
       'vv.mode': ['none', 'static', 'live2d'],
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
       'vv.live2d': ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"],
+      'rain.scanMode': ['2d', '3d'],
+      'pointer.ripple.mode': ['2d', '3d'],
     };
     const themeClone = (value) => JSON.parse(JSON.stringify(value));
     const themeGroup = (source, name) => (source && typeof source === 'object' && source[name] && typeof source[name] === 'object' ? source[name] : {});
@@ -116,6 +120,8 @@ const THEME_DEFAULTS = {
       out.rain.resolution = [720, 1080, 1440].includes(rainResolution) ? rainResolution : 1440;
       out.rain.density = Math.round(themeNumber(rain.density, 25, 200, 100));
       out.rain.speed = Math.round(themeNumber(rain.speed, 25, 200, 100));
+      out.rain.scanMode = themeOneOf('rain.scanMode', rain.scanMode, out.rain.scanMode);
+      out.rain.scanSpeed = Math.round(themeNumber(rain.scanSpeed, 25, 200, 100));
       const gridBreathing = rain.gridBreathing && typeof rain.gridBreathing === 'object' ? rain.gridBreathing : {};
       out.rain.gridBreathing = {
         enabled: gridBreathing.enabled !== false,
@@ -171,6 +177,11 @@ const THEME_DEFAULTS = {
       };
       out.pointer.light = effect(pointer.light, 60);
       out.pointer.ripple = effect(pointer.ripple, 550);
+      const rippleStyle = pointer.ripple && typeof pointer.ripple === 'object' ? pointer.ripple : {};
+      /* 旧的“极简”现在就是 2D；旧的 2D（光带版）已移除 */
+      const rippleMode = rippleStyle.mode === 'minimal' ? '2d' : rippleStyle.mode;
+      out.pointer.ripple.mode = themeOneOf('pointer.ripple.mode', rippleMode, '2d');
+      out.pointer.ripple.speed = Math.round(themeNumber(rippleStyle.speed, 25, 200, 100));
       const press = pointer.press && typeof pointer.press === 'object' ? pointer.press : {};
       const legacyPress = raw.version < 3 && Number(press.strength) === 200;
       out.pointer.press = {
@@ -320,6 +331,14 @@ const VV_OPTIONS = [
       { id: '1080', label: '1K' },
       { id: '1440', label: '2K' },
     ];
+    const SCAN_MODE_OPTIONS = [
+      { id: '2d', label: '2D' },
+      { id: '3d', label: '3D' },
+    ];
+    const RIPPLE_MODE_OPTIONS = [
+      { id: '2d', label: '2D' },
+      { id: '3d', label: '3D' },
+    ];
 
     const css = [
       'body {',
@@ -421,10 +440,8 @@ const VV_OPTIONS = [
       '[class*="_panel"]:not([class*="panelBody"]):has([class*="navCell"]) { background-color: rgba(0, 0, 0, 0.55) !important; backdrop-filter: blur(20px) saturate(1.2); outline: 1px solid rgba(0, 255, 240, 0.55) !important; outline-offset: -1px !important; }',
       '[data-dsh-sidebar] { position: relative; isolation: isolate; z-index: 6; }',
       '[data-dsh-sidebar]::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
-      /* 顶部栏恢复毛玻璃：Windows 标题条 + 会话头。
-         标题条多盖 2px 且这 2px 不填底色，专门盖住两段毛玻璃之间的接缝。 */
-      /* 只给 Windows 标题条保留毛玻璃；会话头不再单独加，避免两层之间出现明暗分界 */
-      'html[data-windows-titlebar] [class*="_frame"][class*="_frame"]::before { backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2); }',
+      /* 2.1.1：窗口最顶部标题栏不再加毛玻璃（用户要求），会话头本来就没加。
+         不要再恢复这条规则：两层毛玻璃叠在背景上会出现明暗分界线。 */
       /* Workspace parent row: distinguishable fill and a left accent. */
       '[class*="_projectRow"] { background-color: rgba(0, 255, 240, 0.10) !important; box-shadow: inset 2px 0 0 rgba(0, 255, 240, 0.55); }',
       /* Session hover card: theme surface and readable text. */
@@ -698,15 +715,87 @@ const VV_OPTIONS = [
       '5': 'afgcd', '6': 'afgecd', '7': 'abc', '8': 'abcdefg', '9': 'abcfgd',
     };
 
-    function SevenDigit({ value }) {
-      const lit = SEG_DIGITS[value] || '';
-      return h('svg', { viewBox: '0 0 44 72', className: 'dsh-seg' },
-        Object.keys(SEG_POINTS).map((name) => h('polygon', {
-          key: name,
-          points: SEG_POINTS[name],
-          className: lit.indexOf(name) >= 0 ? 'dsh-seg-on' : 'dsh-seg-off',
-        })),
-      );
+    /* 0–9 的段码一次性烤成一张雪碧图：每秒只换 background-position，
+       不再逐段改 class / 重画 SVG。辉光直接烤进位图，省掉每段的滤镜层。
+       返回 data URL；极端情况下画布不可用就退回原来的 SVG。 */
+    const sevenSprite = (() => {
+      let cached = undefined;
+      const CELL_W = 44;
+      const CELL_H = 72;
+      const SCALE = 3;
+      const GLOW = 4;
+      return () => {
+        if (cached !== undefined) return cached;
+        cached = null;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = CELL_W * 10 * SCALE;
+          canvas.height = CELL_H * SCALE;
+          const context = canvas.getContext('2d');
+          if (!context) return cached;
+          const trace = (points) => {
+            context.beginPath();
+            points.split(' ').forEach((pair, index) => {
+              const [x, y] = pair.split(',').map(Number);
+              if (index === 0) context.moveTo(x * SCALE, y * SCALE);
+              else context.lineTo(x * SCALE, y * SCALE);
+            });
+            context.closePath();
+          };
+          for (let digit = 0; digit < 10; digit += 1) {
+            const lit = SEG_DIGITS[String(digit)] || '';
+            context.save();
+            context.translate(digit * CELL_W * SCALE, 0);
+            context.fillStyle = 'rgba(0, 255, 240, 0.18)';
+            for (const name of Object.keys(SEG_POINTS)) {
+              if (lit.indexOf(name) >= 0) continue;
+              trace(SEG_POINTS[name]);
+              context.fill();
+            }
+            context.shadowColor = 'rgba(0, 255, 240, 0.9)';
+            context.shadowBlur = GLOW * SCALE;
+            context.fillStyle = '#00fff0';
+            for (const name of Object.keys(SEG_POINTS)) {
+              if (lit.indexOf(name) < 0) continue;
+              trace(SEG_POINTS[name]);
+              context.fill();
+            }
+            context.restore();
+          }
+          cached = canvas.toDataURL('image/png');
+        } catch (error) {
+          cached = null;
+        }
+        return cached;
+      };
+    })();
+
+    function SevenDigit({ value, small = false }) {
+      const sprite = sevenSprite();
+      const digit = SEG_DIGITS[value] ? String(value) : '0';
+      if (!sprite) {
+        const lit = SEG_DIGITS[digit] || '';
+        return h('svg', { viewBox: '0 0 44 72', className: 'dsh-seg' },
+          Object.keys(SEG_POINTS).map((name) => h('polygon', {
+            key: name,
+            points: SEG_POINTS[name],
+            className: lit.indexOf(name) >= 0 ? 'dsh-seg-on' : 'dsh-seg-off',
+          })),
+        );
+      }
+      const width = small ? 11 : 22;
+      const height = small ? 18 : 36;
+      return h('span', {
+        className: 'dsh-seg',
+        style: {
+          width: `${width}px`,
+          height: `${height}px`,
+          backgroundImage: `url(${sprite})`,
+          backgroundSize: `${width * 10}px ${height}px`,
+          backgroundPosition: `${-digit * width}px 0`,
+          backgroundRepeat: 'no-repeat',
+        },
+      });
     }
 
     function CurrencySymbol() {
@@ -721,6 +810,7 @@ const VV_OPTIONS = [
     }
 
     function SevenNumber({ text, currency = true, className = '' }) {
+      const small = className.indexOf('dsh-widget-date') >= 0;
       const children = currency ? [h(CurrencySymbol, { key: 'currency' })] : [];
       text.split('').forEach((char, index) => {
         if (char === '.') {
@@ -735,7 +825,7 @@ const VV_OPTIONS = [
           children.push(h('span', { key: `space${index}`, className: 'dsh-date-space' }));
           return;
         }
-        children.push(h(SevenDigit, { key: `digit${index}`, value: char }));
+        children.push(h(SevenDigit, { key: `digit${index}`, value: char, small }));
       });
       return h('div', { className: className ? 'dsh-seven ' + className : 'dsh-seven' }, children);
     }
@@ -1472,6 +1562,12 @@ const VV_OPTIONS = [
             })),
             sliderRow('密度', config.rain.density, 25, 200, (next) => patch({ rain: { density: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.density),
             sliderRow('下落速度', config.rain.speed, 25, 200, (next) => patch({ rain: { speed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.speed),
+            row('扫描波模式', h(Segmented, {
+              options: SCAN_MODE_OPTIONS,
+              value: config.rain.scanMode,
+              onChange: (id) => patch({ rain: { scanMode: id } }),
+            })),
+            sliderRow('扫描速度', config.rain.scanSpeed, 25, 200, (next) => patch({ rain: { scanSpeed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.scanSpeed),
             ...breathingRows('rain', config.rain.breathing),
           );
         }
@@ -1532,8 +1628,14 @@ const VV_OPTIONS = [
           row('拖拽照明', h(Switch, { on: press.enabled, onChange: (next) => patch({ pointer: { press: { enabled: next } } }) })),
           sliderRow('拖拽强度', press.strength, 0, 200, (next) => patch({ pointer: { press: { strength: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.press.strength),
           row('涟漪效果', h(Switch, { on: ripple.enabled, onChange: (next) => patch({ pointer: { ripple: { enabled: next } } }) })),
+          row('涟漪模式', h(Segmented, {
+            options: RIPPLE_MODE_OPTIONS,
+            value: ripple.mode,
+            onChange: (id) => patch({ pointer: { ripple: { mode: id } } }),
+          })),
           sliderRow('涟漪亮度', ripple.brightness, 0, 200, (next) => patch({ pointer: { ripple: { brightness: next } } }), (value) => `${value}`, THEME_DEFAULTS.pointer.ripple.brightness),
           sliderRow('涟漪范围', ripple.radius, 0, 1100, (next) => patch({ pointer: { ripple: { radius: next } } }), (value) => `${value}px`, THEME_DEFAULTS.pointer.ripple.radius),
+          sliderRow('涟漪速度', ripple.speed, 25, 200, (next) => patch({ pointer: { ripple: { speed: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.ripple.speed),
         );
       })();
 
@@ -1660,6 +1762,37 @@ const VV_OPTIONS = [
       return `${wall.getUTCFullYear()} ${pad2(wall.getUTCMonth() + 1)} ${pad2(wall.getUTCDate())}`;
     }
 
+    /* 时间 / 状态读数单独成组件：只有这一小块每秒 tick，
+       不再让整个主题树（工具条、组件列表、背景面板）跟着重渲染。
+       最小化时跳过，切回来后下一拍自动校准。 */
+    function useNowTick() {
+      const [now, setNow] = React.useState(() => new Date());
+      React.useEffect(() => {
+        const timer = window.setInterval(() => {
+          if (document.hidden) return;
+          setNow(new Date());
+        }, 1000);
+        return () => window.clearInterval(timer);
+      }, []);
+      return now;
+    }
+    function LiveClock() {
+      const now = useNowTick();
+      return h(React.Fragment, null,
+        h(SevenNumber, { text: clockSnapshot(now), currency: false }),
+        h(SevenNumber, { text: dateSnapshot(now), currency: false, className: 'dsh-widget-date' }));
+    }
+    function LiveStatus() {
+      const now = useNowTick();
+      const peak = peakSnapshot(now);
+      return h(React.Fragment, null,
+        h('div', { className: 'dsh-widget-status-row' },
+          h('span', { className: 'dsh-widget-status-now', 'data-state': peak.peak ? 'peak' : 'off' }, peak.peak ? '高峰' : '空闲'),
+          !peak.peak ? h('span', { className: 'dsh-widget-status-price' }, '半价') : null,
+          h('span', { className: 'dsh-widget-status-next' }, '下一状态 ' + peak.nextLabel)),
+        h(SevenNumber, { text: peak.countdown, currency: false }));
+    }
+
     function ThemeEnhancer() {
       const [dividerLeft, setDividerLeft] = React.useState(null);
       const [editing, setEditing] = React.useState(false);
@@ -1729,7 +1862,6 @@ const VV_OPTIONS = [
       });
       const positionsRef = React.useRef(positions);
       positionsRef.current = positions;
-      const [now, setNow] = React.useState(() => new Date());
       const [balance, setBalance] = React.useState(null);
       const [balanceError, setBalanceError] = React.useState(null);
       const [hiddenWidgets, setHiddenWidgets] = React.useState(() => {
@@ -2052,10 +2184,6 @@ const VV_OPTIONS = [
       }, []);
       const [composerBox, setComposerBox] = React.useState(null);
       const [floatHost, setFloatHost] = React.useState(null);
-      React.useEffect(() => {
-        const timer = window.setInterval(() => setNow(new Date()), 1000);
-        return () => window.clearInterval(timer);
-      }, []);
 
       /* The shell overlay layer sits above the dock columns; move the HUD next to it
          so the balance widget can stay above the backdrop but below every panel. */
@@ -2268,6 +2396,7 @@ const VV_OPTIONS = [
         let idlePending = false;
         const schedule = () => {
           if (timer || idlePending) return;
+          if (document.hidden) return;
           timer = window.setTimeout(() => {
             timer = 0;
             const call = () => {
@@ -2316,6 +2445,8 @@ const VV_OPTIONS = [
         const version = (boot.release && boot.release.version) || boot.version || boot.clientVersion || '0.0.0';
         let alive = true;
         const load = () => {
+          /* 最小化时不用轮询余额；恢复可见时 onVisible 会立刻补一次 */
+          if (document.hidden) return;
           const account = sharedResolveAccount ? sharedResolveAccount() : null;
           let getBalance = null;
           if (account) {
@@ -2580,9 +2711,6 @@ const VV_OPTIONS = [
       }, [editing]);
 
       const balanceText = formatBalance(balance);
-      const clockText = clockSnapshot(now);
-      const dateText = dateSnapshot(now);
-      const peak = peakSnapshot(now);
       const TOOL_H = 102;
       /* Keep clear of the window scrollbar: 8px overlapped the thumb's lane. */
       const TOOL_EDGE = 20;
@@ -2840,15 +2968,10 @@ const VV_OPTIONS = [
           : item.id === 'status'
             ? h('div', { className: 'dsh-widget-balance dsh-widget-status', style: editing ? { visibility: 'hidden' } : undefined },
                 h('div', { className: 'dsh-widget-title' }, 'STATUS / 状态'),
-                h('div', { className: 'dsh-widget-status-row' },
-                  h('span', { className: 'dsh-widget-status-now', 'data-state': peak.peak ? 'peak' : 'off' }, peak.peak ? '高峰' : '空闲'),
-                  !peak.peak ? h('span', { className: 'dsh-widget-status-price' }, '半价') : null,
-                  h('span', { className: 'dsh-widget-status-next' }, '下一状态 ' + peak.nextLabel)),
-                h(SevenNumber, { text: peak.countdown, currency: false }))
+                h(LiveStatus))
             : h('div', { className: 'dsh-widget-balance', style: editing ? { visibility: 'hidden' } : undefined },
                 h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
-                h(SevenNumber, { text: clockText, currency: false }),
-                h(SevenNumber, { text: dateText, currency: false, className: 'dsh-widget-date' }));
+                h(LiveClock));
         const widgetScale = widgetScales[item.id] || 1;
         return h('div', {
           key: item.id,
@@ -3031,9 +3154,37 @@ const VV_OPTIONS = [
         try {
           if (!window.__dshExvJank) {
             window.__dshExvTiming = window.__dshExvTiming || { scan: [], compose: [] };
-            const jank = { longTasks: [], gaps: [], fps: 0, startedAt: Date.now() };
+            const jank = { longTasks: [], gaps: [], fps: 0, startedAt: Date.now(), loaf: [] };
             window.__dshExvJank = jank;
             if (typeof PerformanceObserver === 'function') {
+              /* LoAF：把超过 50ms 的动画帧里的脚本、强制样式/布局归属记下来 */
+              try {
+                const supported = PerformanceObserver.supportedEntryTypes || [];
+                if (supported.indexOf('long-animation-frame') >= 0) {
+                  const loafObserver = new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries()) {
+                      if (entry.duration < 50) continue;
+                      const scripts = (entry.scripts || []).slice(0, 8).map((item) => ({
+                        inv: item.invoker || '',
+                        fn: item.functionName || '',
+                        src: String(item.sourceURL || '').slice(-80),
+                        ms: Math.round(item.duration),
+                        forced: Math.round(item.forcedStyleAndLayoutDuration || 0),
+                      }));
+                      jank.loaf.push({
+                        at: Math.round(entry.startTime),
+                        ms: Math.round(entry.duration),
+                        styleAt: entry.styleAndLayoutStart ? Math.round(entry.styleAndLayoutStart - entry.startTime) : null,
+                        scripts,
+                      });
+                      if (jank.loaf.length > 20) jank.loaf.shift();
+                    }
+                  });
+                  loafObserver.observe({ type: 'long-animation-frame', buffered: true });
+                }
+              } catch (error) {
+                /* 旧宿主没有 LoAF */
+              }
               try {
                 const observer = new PerformanceObserver((list) => {
                   for (const entry of list.getEntries()) {
@@ -3067,7 +3218,7 @@ const VV_OPTIONS = [
               }
             };
             window.requestAnimationFrame(probeTick);
-            const jankTimer = window.setInterval(() => {
+            const writeJank = () => {
               const memory = performance.memory;
               const timing = window.__dshExvTiming || { scan: [], compose: [] };
               const summarize = (list) => {
@@ -3086,9 +3237,18 @@ const VV_OPTIONS = [
                   longTasks: jank.longTasks.slice(-20),
                   scan: summarize(timing.scan),
                   compose: summarize(timing.compose),
+                  loaf: jank.loaf.slice(-5),
                 }));
               } catch (error) {
                 /* ignore storage errors */
+              }
+            };
+            const jankTimer = window.setInterval(() => {
+              /* localStorage 写入是同步的：放到空闲时段，别和雨/动画抢帧 */
+              if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(writeJank, { timeout: 3000 });
+              } else {
+                writeJank();
               }
             }, 10000);
             ctx.effect(() => () => window.clearInterval(jankTimer));

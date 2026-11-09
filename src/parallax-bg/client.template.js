@@ -35,13 +35,15 @@ const THEME_DEFAULTS = {
         resolution: 1440,
         density: 100,
         speed: 100,
+        scanMode: '2d',
+        scanSpeed: 100,
         breathing: { enabled: true, amplitude: 12 },
       },
       logos: { preset: 'default', enabled: true, size: 150, breathing: { enabled: true, amplitude: 12 } },
       vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, breathing: { enabled: true, amplitude: 12 } },
       pointer: {
         light: { enabled: true, brightness: 100, radius: 60 },
-        ripple: { enabled: true, brightness: 100, radius: 550 },
+        ripple: { enabled: true, brightness: 100, radius: 550, mode: '2d', speed: 100 },
         press: { enabled: true, strength: 100 },
       },
     };
@@ -51,6 +53,8 @@ const THEME_DEFAULTS = {
       'vv.mode': ['none', 'static', 'live2d'],
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
       'vv.live2d': ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"],
+      'rain.scanMode': ['2d', '3d'],
+      'pointer.ripple.mode': ['2d', '3d'],
     };
     const themeClone = (value) => JSON.parse(JSON.stringify(value));
     const themeGroup = (source, name) => (source && typeof source === 'object' && source[name] && typeof source[name] === 'object' ? source[name] : {});
@@ -103,6 +107,8 @@ const THEME_DEFAULTS = {
       out.rain.resolution = [720, 1080, 1440].includes(rainResolution) ? rainResolution : 1440;
       out.rain.density = Math.round(themeNumber(rain.density, 25, 200, 100));
       out.rain.speed = Math.round(themeNumber(rain.speed, 25, 200, 100));
+      out.rain.scanMode = themeOneOf('rain.scanMode', rain.scanMode, out.rain.scanMode);
+      out.rain.scanSpeed = Math.round(themeNumber(rain.scanSpeed, 25, 200, 100));
       const gridBreathing = rain.gridBreathing && typeof rain.gridBreathing === 'object' ? rain.gridBreathing : {};
       out.rain.gridBreathing = {
         enabled: gridBreathing.enabled !== false,
@@ -158,6 +164,11 @@ const THEME_DEFAULTS = {
       };
       out.pointer.light = effect(pointer.light, 60);
       out.pointer.ripple = effect(pointer.ripple, 550);
+      const rippleStyle = pointer.ripple && typeof pointer.ripple === 'object' ? pointer.ripple : {};
+      /* 旧的“极简”现在就是 2D；旧的 2D（光带版）已移除 */
+      const rippleMode = rippleStyle.mode === 'minimal' ? '2d' : rippleStyle.mode;
+      out.pointer.ripple.mode = themeOneOf('pointer.ripple.mode', rippleMode, '2d');
+      out.pointer.ripple.speed = Math.round(themeNumber(rippleStyle.speed, 25, 200, 100));
       const press = pointer.press && typeof pointer.press === 'object' ? pointer.press : {};
       const legacyPress = raw.version < 3 && Number(press.strength) === 200;
       out.pointer.press = {
@@ -469,12 +480,12 @@ const THEME_DEFAULTS = {
       /* 光带本体：一个径向渐变光环负责泛光，两道圆弧负责清晰的锋面。
          之前用 7 层同心描边叠亮度，层数少时能看出同心台阶；渐变是连续的。
          渐变直接画在主画布上（离屏放大在软件光栅下反而更慢）。 */
-      const strokeBeam = (centerX, centerY, radius, intensity) => {
+      const strokeBeam = (centerX, centerY, radius, intensity, maxGlow) => {
         if (radius <= 0 || intensity <= 0.004) return;
         const alpha = Math.min(1, intensity);
-        /* 光带宽度跟着视口走：小窗窄一点，4K 宽一点 */
+        /* 光带宽度跟着视口走：小窗窄一点，4K 宽一点；点击涟漪可以用 maxGlow 收窄 */
         const scale = Math.max(0.7, Math.min(2.2, Math.hypot(width, height) / 2400));
-        const glow = 180 * scale;
+        const glow = Number.isFinite(maxGlow) ? Math.min(180 * scale, maxGlow) : 180 * scale;
         const inner = Math.max(0, radius - glow);
         const outer = Math.max(radius + glow, inner + 1);
         /* 亮度剖面以 radius 为中心、向两侧对称衰减；写成连续 stop，
@@ -518,6 +529,10 @@ const THEME_DEFAULTS = {
 
       const stampCells = (wave, radius, strength, now) => {
         if (strength <= 0.01) return;
+        /* 每个波可以有自己的余辉/下沉时长与 2D/3D 风格：点击涟漪和全屏扫描互不干扰 */
+        const trail = Number.isFinite(wave.trailSeconds) ? wave.trailSeconds : CELL_TRAIL_SECONDS;
+        const sink = Number.isFinite(wave.sinkSeconds) ? wave.sinkSeconds : SCAN3D_SINK_SECONDS;
+        const threeD = Boolean(wave.threeD);
         const inner = Math.max(0, radius - STEP * 0.9);
         const outer = radius + STEP * 0.9;
         const outer2 = outer * outer;
@@ -537,9 +552,12 @@ const THEME_DEFAULTS = {
           const cell = litCells.get(key);
           if (cell) {
             cell.t = now;
+            cell.trail = trail;
+            cell.sink = sink;
+            cell.threeD = threeD;
             if (strength > cell.a) cell.a = strength;
           } else if (litCells.size < cap) {
-            litCells.set(key, { x: 6 + col * STEP, y: row * STEP, t: now, a: strength });
+            litCells.set(key, { x: 6 + col * STEP, y: row * STEP, t: now, a: strength, trail, sink, threeD });
           }
         };
         /* 只遍历圆环内的格子：按列解出上下两段行区间，
@@ -560,50 +578,94 @@ const THEME_DEFAULTS = {
         }
       };
 
-      /* 按亮度分档批量画：每档一次 stroke，几千个方格也只有几十次绘制。
-         分档数组复用，避免每帧新建 72 个数组制造 GC 抖动。 */
+      /* 按亮度分档批量画：每档只设一次 fillStyle，几千个方格也只有几十次状态切换。
+         空心方格用 4 条实心边拼成：“上/下通长、左/右让开两角”，四条边互不重叠，
+         几何上等价于 1.5px 逐格描边，边框位置、格子间隙和余辉亮度都保持一致。
+         不用 stroke 的原因：canvas 的小矩形描边要走路径细分，2K 满屏余辉（约 3800
+         格）实测 rAF p90 40ms；fillRect 走矩形快速路径，同样格数 p90 13.4ms。 */
       const waveBuckets = [];
       for (let level = 0; level < CELL_FADE_BUCKETS; level += 1) waveBuckets.push([]);
+      const CELL_EDGE = 1.5;
+      const CELL_SIDE = CELL - CELL_EDGE * 2;
+      /* 3D 扫描：整片方格当水面看，波峰把当前一圈格子“抬”起来（放大、变亮），
+         波过去之后再慢慢沉回原位；这个模式没有核心光束，只有余晖的亮度衰减。
+         每格在 stamp 时记下所属波形的风格与余辉/下沉时长，所以点击涟漪和全屏
+         扫描可以各自使用不同速度、同时存在。 */
+      const SCAN3D_LIFT = 0.34;          /* 波峰处额外放大的比例 */
+      const SCAN3D_SINK_SECONDS = 0.85;  /* 从波峰沉回原位的时长（秒） */
+      const SCAN3D_CREST_ALPHA = 0.55;   /* 波峰相对余晖的额外亮度占比 */
+      /* 点击 3D：扩散距离减半、余辉继续缩短、下沉也随小半径收紧，
+         这样一次点击的存活格少、衰减快，可以同时存在很多个涟漪。 */
+      const CLICK3D_TRAIL_SECONDS = 0.8; /* 点击 3D 的余辉时长（100% 速度） */
+      const CLICK3D_SINK_SECONDS = 0.55; /* 点击 3D 的下沉时长（100% 速度） */
+      const CLICK3D_RADIUS_FACTOR = 0.5; /* 3D 涟漪扩散距离 = 涟漪范围的一半 */
       const drawLitCells = (now) => {
         if (litCells.size === 0) return;
         for (const [key, cell] of litCells) {
           const age = (now - cell.t) / 1000;
-          if (age >= CELL_TRAIL_SECONDS) {
+          const trail = cell.trail || CELL_TRAIL_SECONDS;
+          if (age >= trail) {
             litCells.delete(key);
             continue;
           }
           /* 线性衰减：亮度随时间均匀下降，不再先陡后缓 */
-          const fade = 1 - age / CELL_TRAIL_SECONDS;
-          const alpha = cell.a * fade;
+          const fade = 1 - age / trail;
+          let alpha = cell.a * fade;
           if (alpha <= 0.012) continue;
+          if (cell.threeD) {
+            const sink = cell.sink || SCAN3D_SINK_SECONDS;
+            const settle = 1 - Math.min(1, age / sink);
+            /* 波峰处最亮，沉下去后只剩逐渐衰减的余晖 */
+            cell.swell = settle;
+            alpha *= (1 - SCAN3D_CREST_ALPHA) + SCAN3D_CREST_ALPHA * cell.swell;
+          }
           const level = Math.min(CELL_FADE_BUCKETS - 1, Math.floor(alpha * CELL_FADE_BUCKETS));
           waveBuckets[level].push(cell);
         }
-        context.lineWidth = 1.5;
         for (let level = 0; level < CELL_FADE_BUCKETS; level += 1) {
           const cells = waveBuckets[level];
           if (cells.length === 0) continue;
-          context.beginPath();
-          /* 逐格描边：方格之间保留空隙，这是背景网格的原有观感 */
+          context.fillStyle = paint(((level + 0.5) / CELL_FADE_BUCKETS) * 0.95);
           for (const cell of cells) {
-            context.rect(cell.x + 0.75, cell.y + 0.75, CELL - 1.5, CELL - 1.5);
+            if (cell.threeD) {
+              /* 以格子中心放大：波峰处格子变大、线宽也跟着变粗、间隙收窄，
+                 像水面鼓起来（线宽随高度一起放大，透视上更连贯） */
+              const grow = SCAN3D_LIFT * cell.swell;
+              const size = CELL + CELL * grow;
+              const edge = CELL_EDGE * (1 + grow);
+              const inset = (size - CELL) / 2;
+              const x = cell.x - inset;
+              const y = cell.y - inset;
+              context.fillRect(x, y, size, edge);
+              context.fillRect(x, y + size - edge, size, edge);
+              context.fillRect(x, y + edge, edge, size - edge * 2);
+              context.fillRect(x + size - edge, y + edge, edge, size - edge * 2);
+            } else {
+              /* 逐格画边：方格之间保留空隙，这是背景网格的原有观感 */
+              context.fillRect(cell.x, cell.y, CELL, CELL_EDGE);
+              context.fillRect(cell.x, cell.y + CELL - CELL_EDGE, CELL, CELL_EDGE);
+              context.fillRect(cell.x, cell.y + CELL_EDGE, CELL_EDGE, CELL_SIDE);
+              context.fillRect(cell.x + CELL - CELL_EDGE, cell.y + CELL_EDGE, CELL_EDGE, CELL_SIDE);
+            }
           }
-          context.strokeStyle = paint(((level + 0.5) / CELL_FADE_BUCKETS) * 0.95);
-          context.stroke();
           cells.length = 0;
         }
       };
 
       const drawWaves = (now) => {
-        const ripple = pointerConfig().ripple;
+        const themeConfig = config();
+        const pointerState = themeConfig.pointer || {};
+        const ripple = pointerState.ripple;
         const rippleOn = !ripple || ripple.enabled !== false;
         if (!rippleOn) {
           for (let index = waves.length - 1; index >= 0; index -= 1) {
-            if (waves[index].kind !== 'scan') waves.splice(index, 1);
+            if (waves[index].kind !== 'scan' || waves[index].click) waves.splice(index, 1);
           }
         }
         const brightness = ripple ? ripple.brightness / 100 : 1;
         const clickMaxRadius = ripple ? ripple.radius : 550;
+        const rawClickSpeed = Number(ripple && ripple.speed);
+        const clickSpeedScale = Math.max(0.25, Math.min(2, (Number.isFinite(rawClickSpeed) ? rawClickSpeed : 100) / 100));
         for (let index = waves.length - 1; index >= 0; index -= 1) {
           const wave = waves[index];
           const scan = wave.kind === 'scan';
@@ -611,7 +673,7 @@ const THEME_DEFAULTS = {
             waves.splice(index, 1);
             continue;
           }
-          const speed = scan ? (Number(wave.speed) || 320) : 560;
+          const speed = Number(wave.speed) || (scan ? 320 : 560 * clickSpeedScale);
           const age = (now - wave.born) / 1000;
           let radius = age * speed;
           if (scan) {
@@ -629,32 +691,31 @@ const THEME_DEFAULTS = {
               );
             }
             radius = wave.displayRadius;
-          }
-          let attenuation = 1;
-          if (scan) {
-            /* 半径上限按"当前"画布算：波扫到一半用户改窗口大小也不会扫不到边 */
-            const maxRadius = Math.hypot(width, height) + STEP * 2;
-            if (radius > maxRadius) {
+            /* 全屏扫描用画布对角线；点击涟漪用设置里的“涟漪范围” */
+            const maxRadius = Number.isFinite(wave.maxRadius) ? wave.maxRadius : Math.hypot(width, height) + STEP * 2;
+            if (maxRadius <= 0 || radius > maxRadius) {
               waves.splice(index, 1);
               continue;
             }
             /* 起步 0.25s 淡入，收尾 16% 半径淡出，避免光带头尾硬切 */
             const fadeIn = Math.min(1, age / 0.25);
             const fadeOut = Math.max(0, Math.min(1, (maxRadius - radius) / (maxRadius * 0.16)));
-            const strength = 0.95 * Math.min(fadeIn, fadeOut) * brightness;
+            /* 点击 3D 的“最高亮度”也随扩散距离一起衰减：越接近边缘，连波峰都很暗，
+               看起来像自然散开；全屏扫描波保持原来的亮度。 */
+            const edgeFade = wave.click ? Math.max(0, 1 - radius / maxRadius) : 1;
+            const strength = 0.95 * Math.min(fadeIn, fadeOut) * brightness * edgeFade;
             /* 光带扫过的方格单独记时间，之后各自衰减 */
             stampCells(wave, radius, strength, now);
-            strokeBeam(wave.x, wave.y, radius, strength);
+            if (!wave.threeD) strokeBeam(wave.x, wave.y, radius, strength, wave.beamGlow);
             continue;
-          } else {
-            attenuation = 1 - radius / clickMaxRadius;
-            if (attenuation <= 0) {
-              waves.splice(index, 1);
-              continue;
-            }
           }
 
-          /* 点击涟漪：只保留网格响应 */
+          /* 2D 点击涟漪：只画当前这一圈网格，不做余辉 */
+          const attenuation = 1 - radius / clickMaxRadius;
+          if (attenuation <= 0) {
+            waves.splice(index, 1);
+            continue;
+          }
           const inner = Math.max(0, radius - STEP * 0.9);
           const outer = radius + STEP * 0.9;
           const minCol = Math.floor((wave.x - outer) / STEP);
@@ -680,13 +741,28 @@ const THEME_DEFAULTS = {
         const w = width || window.innerWidth;
         const h = height || window.innerHeight;
         const diagonal = Math.hypot(w, h);
+        /* 点击按钮启动扫描波时，这次按下已经生成了一圈涟漪；
+           扫描波从同一处起跑会把两层盖在一起，所以只把这次按下的涟漪撤掉，
+           扫描波开始后用户再点仍然是正常的点击涟漪。 */
+        const startedAt = performance.now();
+        for (let index = waves.length - 1; index >= 0; index -= 1) {
+          const wave = waves[index];
+          if (wave.click && startedAt - wave.born < 700) waves.splice(index, 1);
+        }
+        const rainConfig = config().rain || {};
+        const rawSpeed = Number(rainConfig.scanSpeed);
+        const speedScale = Math.max(0.25, Math.min(2, (Number.isFinite(rawSpeed) ? rawSpeed : 100) / 100));
         waves.push({
           kind: 'scan',
           x: Number.isFinite(x) ? x : w / 2,
           y: Number.isFinite(y) ? y : h / 2,
           born: performance.now(),
-          /* 按对角线换算速度：任何窗口比例、任何分辨率下都是约 7 秒扫完整个屏幕 */
-          speed: Math.max(150, diagonal / 7),
+          /* 按对角线换算速度：100% 时约 7 秒扫完整个屏幕；扫描速度滑条按比例缩放 */
+          speed: Math.max(150, diagonal / 7) * speedScale,
+          threeD: rainConfig.scanMode === '3d',
+          /* 余辉/下沉按速度反比缩放，保证不同速度下波形空间宽度一致 */
+          trailSeconds: CELL_TRAIL_SECONDS / speedScale,
+          sinkSeconds: SCAN3D_SINK_SECONDS / speedScale,
         });
       };
 
@@ -951,7 +1027,31 @@ const THEME_DEFAULTS = {
         const ripple = pointerConfig().ripple;
         if (ripple && ripple.enabled === false) return;
         const rect = canvas.getBoundingClientRect();
-        waves.push({ x: event.clientX - rect.left, y: event.clientY - rect.top, born: performance.now() });
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const born = performance.now();
+        const rawSpeed = Number(ripple && ripple.speed);
+        const speedScale = Math.max(0.25, Math.min(2, (Number.isFinite(rawSpeed) ? rawSpeed : 100) / 100));
+        const mode = ripple && ripple.mode ? ripple.mode : '2d';
+        if (mode === '3d') {
+          /* 3D 涟漪复用扫描波的抬升/余辉逻辑；扩散距离按涟漪范围减半 */
+          const maxRadius = Math.max(0, (Number(ripple && ripple.radius) || 0) * CLICK3D_RADIUS_FACTOR);
+          if (maxRadius <= 0) return;
+          waves.push({
+            kind: 'scan',
+            click: true,
+            x,
+            y,
+            born,
+            speed: 560 * speedScale,
+            maxRadius,
+            threeD: true,
+            trailSeconds: CLICK3D_TRAIL_SECONDS / speedScale,
+            sinkSeconds: CLICK3D_SINK_SECONDS / speedScale,
+          });
+          return;
+        }
+        waves.push({ x, y, born, speed: 560 * speedScale });
       };
       const onPointerUp = () => {
         pressing = false;
@@ -1708,3 +1808,4 @@ const THEME_DEFAULTS = {
     };
   },
 });
+
