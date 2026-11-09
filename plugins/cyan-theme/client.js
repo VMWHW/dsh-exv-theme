@@ -518,6 +518,13 @@ const VV_OPTIONS = [
       '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) :where(*) { color: #000 !important; }',
       '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) { background-color: #00fff0 !important; color: #000 !important; transition: background-color .18s ease !important; }',
       '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) :where(*) { color: #000 !important; }',
+      /* 2.2：已编辑 X 个文件——母控件（卡片头）用毛玻璃，展开的文件列表用实底，
+         两层一眼能分清；悬停变实心青的规则优先级更高，仍然生效。 */
+      '[class*="HOHHba_card"] { background: rgba(0, 0, 0, 0.34) !important; border-color: rgba(0, 255, 240, 0.50) !important; }',
+      '[class*="HOHHba_header"] { background-color: rgba(0, 0, 0, 0.16) !important; backdrop-filter: blur(16px) saturate(1.15); -webkit-backdrop-filter: blur(16px) saturate(1.15); }',
+      '[class*="HOHHba_list"] { background-color: rgba(0, 0, 0, 0.72) !important; border-top-color: rgba(0, 255, 240, 0.35) !important; }',
+      '[class*="HOHHba_toggle"] { background-color: rgba(0, 0, 0, 0.72) !important; }',
+      '[class*="HOHHba_toggle"]:hover { background-color: rgba(0, 255, 240, 0.16) !important; color: #00fff0 !important; }',
       /* Delivered file cards: same tinted surface and solid-cyan hover as the
          changed-files card, so both boxes read as one family. */
       '[data-presented-file] { background: linear-gradient(rgba(0, 255, 240, 0.12), rgba(0, 255, 240, 0.12)), rgba(0, 0, 0, 0.45) !important; border: .5px solid #00fff0 !important; transition: background-color .18s ease, border-color .18s ease; }',
@@ -528,6 +535,10 @@ const VV_OPTIONS = [
          its current size; links (file mentions included) stay theme cyan. */
       '[data-chat-flow-kind="assistant-step"] [class*="_markdown_"]:not([data-markdown-variant="compact"]) { font-size: calc(var(--dsh-content-font-size, 14px) + 1px) !important; line-height: calc(24px + var(--dsh-content-font-delta, 0px) + 2px) !important; }',
       '[data-slot="conversation.chat.flow"] a, [data-slot="conversation.chat.flow"] a:visited, [data-slot="conversation.chat.flow"] [class*="_fileLink_"], [data-slot="conversation.chat.flow"] [class*="_fileMention_"] { color: #00fff0 !important; }',
+      /* 2.2：对话区链接悬停——去掉内嵌描边/虚线下划线，整段文字连外框一起反成青底黑字 */
+      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]) { border-color: transparent !important; outline: none !important; text-decoration: none !important; }',
+      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover { background-color: #00fff0 !important; color: #000 !important; border-color: transparent !important; box-shadow: none !important; outline: none !important; text-decoration: none !important; }',
+      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover :where(*) { color: #000 !important; }',
       /* Turn navigation rail: thicker marks, cyan hover/active glow. */
       '[class*="_marks"] [class*="_mark"]::before { height: 3px !important; }',
       '[class*="_marks"] [class*="_mark"]:hover:not(:disabled) { background-color: transparent !important; box-shadow: none !important; }',
@@ -548,14 +559,30 @@ const VV_OPTIONS = [
       '[class*="previewBadge"] { color: #00fff0 !important; border-color: rgba(0, 255, 240, 0.45) !important; background: rgba(0, 255, 240, 0.12) !important; }',
       /* Modal dialogs (permission warnings): readable opacity. */
       '[class*="_dialog_"] { background-color: rgba(0, 0, 0, 0.78) !important; backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1); }',
+      /* 2.2：宿主默认提示框是灰底白字，和主题不搭；统一成黑底青字 + 青色键帽。
+         键帽那格单独给一档浅青底，和正文区分。 */
+      '[role="tooltip"] { background-color: rgba(0, 0, 0, 0.80) !important; border: 1px solid rgba(0, 255, 240, 0.45) !important; box-shadow: 0 0 18px rgba(0, 255, 240, 0.18) !important; }',
+      '[role="tooltip"] :is(kbd, [class*="kbd"], [class*="shortcut"], [class*="Shortcut"]) { background: rgba(0, 255, 240, 0.16) !important; color: #00fff0 !important; border: 1px solid rgba(0, 255, 240, 0.40) !important; }',
+      /* 悬停“已编辑文件”弹出的细节控件：毛玻璃 + 更浅的底，diff 文字才读得清 */
+      '[role="tooltip"]:has([data-changes-hover-preview]), [role="tooltip"]:has([data-changes-hover-preview])[class*="preview"] { background: rgba(0, 0, 0, 0.34) !important; backdrop-filter: blur(20px) saturate(1.2) !important; -webkit-backdrop-filter: blur(20px) saturate(1.2) !important; border: 1px solid rgba(0, 255, 240, 0.42) !important; }',
+      ':where(div, section):has(> [data-changes-hover-preview]) { background-color: rgba(0, 0, 0, 0.30) !important; backdrop-filter: blur(20px) saturate(1.2); -webkit-backdrop-filter: blur(20px) saturate(1.2); border: 1px solid rgba(0, 255, 240, 0.42) !important; }',
+      '[data-changes-hover-preview] { background: transparent !important; }',
       /* Tooltips keep their own light text even inside a hovered button. */
-      '[class*="bubble"][data-portal], [class*="bubble"][data-portal] :where(*), [role="tooltip"], [role="tooltip"] :where(*) { color: rgba(255, 255, 255, 0.95) !important; }',
+      '[class*="bubble"][data-portal], [class*="bubble"][data-portal] :where(*) { color: rgba(255, 255, 255, 0.95) !important; }',
+      '[role="tooltip"], [role="tooltip"] :where(*) { color: #00fff0 !important; }',
       /* HUD widgets: 7-segment balance card and edit-mode chrome. */
       '.dsh-widget { position: fixed; z-index: -1; width: max-content; pointer-events: none; user-select: none; }',
       /* 非编辑态压在会话文本下面；编辑态浮上来（仍在设置等弹层之下），否则拖不动 */
       '.dsh-widget.is-editing { z-index: 19; pointer-events: auto; cursor: move; }',
       '.dsh-widget-scale { position: relative; display: block; }',
       '.dsh-widget-balance { box-sizing: border-box; min-height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; background: rgba(0, 0, 0, 0.58); border: 2px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18), inset 0 0 24px rgba(0, 255, 240, 0.06); }',
+      /* 余额下降：整块底变主题色（与常态同透明度），数字转黑，停手 1s 后还原 */
+      '.dsh-widget-balance.is-spending { background: rgba(0, 255, 240, 0.58); border-color: #00fff0; box-shadow: 0 0 26px rgba(0, 255, 240, 0.45), inset 0 0 24px rgba(0, 0, 0, 0.10); }',
+      '.dsh-widget-balance.is-spending .dsh-widget-title { color: #000 !important; }',
+      '.dsh-widget-balance.is-spending .dsh-seg { filter: brightness(0); }',
+      '.dsh-widget-balance.is-spending .dsh-dot { background: #000; box-shadow: none; }',
+      '.dsh-widget-balance.is-spending .dsh-colon::before, .dsh-widget-balance.is-spending .dsh-colon::after { background: #000; box-shadow: none; }',
+      '.dsh-widget-balance.is-spending .dsh-widget-value { color: #000; }',
       '.dsh-widget-title { font-size: 13px; letter-spacing: 0.3em; color: rgba(0, 255, 240, 0.80); }',
       '.dsh-seven { display: flex; align-items: center; gap: 3px; }',
       '.dsh-seg { width: 22px; height: 36px; display: block; }',
@@ -572,6 +599,11 @@ const VV_OPTIONS = [
       '.dsh-widget-status-now[data-state="off"] { color: rgba(0, 255, 240, 0.72); text-shadow: none; }',
       '.dsh-widget-status-next { font-size: 10px; letter-spacing: 0.10em; color: rgba(0, 255, 240, 0.52); }',
       '.dsh-widget-status-price { font-size: 9px; line-height: 14px; padding: 0 4px; letter-spacing: 0.08em; color: #00fff0; border: 1px solid rgba(0, 255, 240, 0.55); }',
+      /* 2.2：高峰时段给状态组件一层很淡的主题色底——长时间显示，不能像余额那样闪 */
+      '.dsh-widget-status { transition: background-color .45s ease, border-color .45s ease; }',
+      '.dsh-widget-status[data-peak="1"] { background-color: rgba(0, 255, 240, 0.15); border-color: rgba(0, 255, 240, 0.90); box-shadow: 0 0 22px rgba(0, 255, 240, 0.28), inset 0 0 24px rgba(0, 255, 240, 0.10); }',
+      '.dsh-widget-status[data-peak="1"] .dsh-widget-title { color: #00fff0; }',
+      '.dsh-widget-status[data-peak="1"] .dsh-widget-status-next { color: rgba(0, 255, 240, 0.72); }',
       '.dsh-widget-date { width: 100%; justify-content: space-between; gap: 0; opacity: 0.72; }',
       '.dsh-widget-date .dsh-seg { width: 11px; height: 18px; }',
       '.dsh-widget-date .dsh-date-space { flex: 0 0 4px; }',
@@ -680,8 +712,9 @@ const VV_OPTIONS = [
       '.dsh-clip-hint { flex: 1 1 auto; min-height: 22px; display: flex; align-items: center; justify-content: center; padding: 0 4px; background: rgba(0, 255, 240, 0.12); border: 1px dashed rgba(0, 255, 240, 0.78); color: #00fff0 !important; font-size: 11px; letter-spacing: 0.06em; }',
       '.dsh-clip-slot[data-armed] { border-color: #00fff0; box-shadow: 0 0 18px rgba(0, 255, 240, 0.35); }',
       '.dsh-clip-notice { position: absolute; right: 6px; top: 6px; font-size: 10px; color: #00fff0; text-shadow: 0 0 8px rgba(0, 255, 240, 0.5); }',
-      '.dsh-clip-chip { width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #000 !important; background: #00fff0; pointer-events: auto; cursor: pointer; box-shadow: 0 0 12px rgba(0, 255, 240, 0.45); }',
-      '.dsh-clip-chip:hover { background: #fff; }',
+      '.dsh-clip-chip { box-sizing: border-box; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: rgba(0, 255, 240, 0.80) !important; background: rgba(0, 255, 240, 0.14); border: 1px solid rgba(0, 255, 240, 0.40); pointer-events: auto; cursor: pointer; transition: background-color .12s ease, color .12s ease; }',
+      '.dsh-clip-chip[data-filled] { background: rgba(0, 255, 240, 0.30); color: #00fff0 !important; }',
+      '.dsh-clip-chip:hover { background: #00fff0; color: #000 !important; border-color: #00fff0; }',
       /* 剪贴板面板 */
       '.dsh-switch { box-sizing: border-box; position: relative; display: block; flex: 0 0 auto; width: 36px; height: 20px; padding: 2px; background: var(--dsw-alias-border-l3, rgba(0, 255, 240, 0.45)); cursor: pointer; }',
       '.dsh-switch[data-on] { background: var(--dsw-alias-brand-primary, #00fff0); }',
@@ -861,6 +894,21 @@ const VV_OPTIONS = [
     const CLIP_MIN_H = 110;
     const CLIP_MAX_H = 420;
     const CLIP_DEFAULT_SIZE = { w: 184, h: 148 };
+
+    /* file:// URI → 本机绝对路径。旧数据里文件格存的是 URI，
+       新数据直接存路径；两种都兼容，Windows 盘符路径统一成反斜杠。 */
+    const fileUriToPath = (value) => {
+      let text = String(value || '').trim();
+      if (!text) return '';
+      if (/^file:/i.test(text)) {
+        const unc = /^file:\/{2}[^/\\]/i.test(text);
+        text = text.replace(/^file:\/{1,3}/i, '');
+        try { text = decodeURIComponent(text); } catch (error) { /* 保留原文 */ }
+        if (unc) return '\\\\' + text.replace(/\//g, '\\');
+      }
+      if (/^[a-zA-Z]:\//.test(text)) return text.replace(/\//g, '\\');
+      return text;
+    };
 
     const readClipSlots = () => {
       let raw = [];
@@ -1782,15 +1830,85 @@ const VV_OPTIONS = [
         h(SevenNumber, { text: clockSnapshot(now), currency: false }),
         h(SevenNumber, { text: dateSnapshot(now), currency: false, className: 'dsh-widget-date' }));
     }
-    function LiveStatus() {
+    function LiveStatus({ editing }) {
       const now = useNowTick();
       const peak = peakSnapshot(now);
-      return h(React.Fragment, null,
+      return h('div', {
+        className: 'dsh-widget-balance dsh-widget-status',
+        'data-peak': peak.peak ? '1' : '0',
+        style: editing ? { visibility: 'hidden' } : undefined,
+      },
+        h('div', { className: 'dsh-widget-title' }, 'STATUS / 状态'),
         h('div', { className: 'dsh-widget-status-row' },
           h('span', { className: 'dsh-widget-status-now', 'data-state': peak.peak ? 'peak' : 'off' }, peak.peak ? '高峰' : '空闲'),
           !peak.peak ? h('span', { className: 'dsh-widget-status-price' }, '半价') : null,
           h('span', { className: 'dsh-widget-status-next' }, '下一状态 ' + peak.nextLabel)),
         h(SevenNumber, { text: peak.countdown, currency: false }));
+    }
+
+    /* 余额：数字从最低位开始逐位滚到新值；下降时整块底闪成主题色，
+       停手 1s 后还原。位宽变化（9.99 → 10.00）直接换值，避免观感错乱。 */
+    function BalanceBody({ text, editing }) {
+      const target = text === null || text === undefined ? '' : String(text);
+      const [shown, setShown] = React.useState(target);
+      const shownRef = React.useRef(target);
+      const timers = React.useRef([]);
+      const spendTimer = React.useRef(0);
+      const [spending, setSpending] = React.useState(false);
+      React.useEffect(() => {
+        const current = shownRef.current;
+        if (!target || target === current) {
+          shownRef.current = target;
+          setShown(target);
+          return undefined;
+        }
+        timers.current.forEach((id) => window.clearTimeout(id));
+        timers.current = [];
+        window.clearTimeout(spendTimer.current);
+        const oldValue = Number(current);
+        const newValue = Number(target);
+        const decreasing = Number.isFinite(oldValue) && Number.isFinite(newValue) && newValue < oldValue;
+        let changed = 0;
+        for (let index = 0; index < target.length; index += 1) {
+          if (current[index] !== target[index]) changed += 1;
+        }
+        const rollable = current.length === target.length && changed > 0;
+        if (!rollable) {
+          shownRef.current = target;
+          setShown(target);
+        } else {
+          let step = 0;
+          for (let index = target.length - 1; index >= 0; index -= 1) {
+            if (current[index] === target[index]) continue;
+            const delay = 80 + step * 80;
+            step += 1;
+            timers.current.push(window.setTimeout(() => {
+              const chars = shownRef.current.split('');
+              chars[index] = target[index];
+              shownRef.current = chars.join('');
+              setShown(shownRef.current);
+            }, delay));
+          }
+        }
+        if (decreasing) {
+          setSpending(true);
+          const rollMs = rollable ? 80 + Math.max(0, changed - 1) * 80 + 140 : 0;
+          spendTimer.current = window.setTimeout(() => setSpending(false), rollMs + 1000);
+        } else {
+          setSpending(false);
+        }
+        return undefined;
+      }, [target]);
+      React.useEffect(() => () => {
+        timers.current.forEach((id) => window.clearTimeout(id));
+        window.clearTimeout(spendTimer.current);
+      }, []);
+      return h('div', {
+        className: spending ? 'dsh-widget-balance is-spending' : 'dsh-widget-balance',
+        style: editing ? { visibility: 'hidden' } : undefined,
+      },
+        h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
+        shown === '' ? h('div', { className: 'dsh-widget-value' }, '--') : h(SevenNumber, { text: shown }));
     }
 
     function ThemeEnhancer() {
@@ -1965,6 +2083,19 @@ const VV_OPTIONS = [
         notifyClip(index, '已放入文件');
       };
 
+      /* 资源管理器复制文件时剪贴板里带 text/uri-list，比 File 对象更可靠：
+         File 在 Electron 里不一定有 .path，拿不到就会退化成文件名。
+         这里优先用 URI 换出绝对路径。 */
+      const storeFileUri = (index, uriText) => {
+        const first = String(uriText || '').split(/\r?\n/).map((line) => line.trim()).find((line) => line && line.charAt(0) !== '#');
+        if (!first) return false;
+        const path = fileUriToPath(first);
+        const name = path.split(/[\\/]/).pop() || path;
+        setSlot(index, { kind: 'file', text: path, image: '', name });
+        notifyClip(index, '已放入文件');
+        return true;
+      };
+
       const armClipPaste = (index) => {
         setClipArmed(index);
         window.clearTimeout(clipArmTimer.current);
@@ -1991,18 +2122,15 @@ const VV_OPTIONS = [
           event.stopPropagation();
           disarmClipPaste();
           if (files.length > 0) {
-            storePastedFile(index, files[0]);
+            const first = files[0];
+            const isImage = typeof first.type === 'string' && first.type.indexOf('image/') === 0;
+            /* 图片继续走 FileReader 出缩略图；普通文件优先用 uri-list 拿绝对路径 */
+            if (!isImage && uri && storeFileUri(index, uri)) return;
+            storePastedFile(index, first);
             return;
           }
           if (uri) {
-            const first = uri.split(/\r?\n/).map((line) => line.trim()).find((line) => line && line.charAt(0) !== '#');
-            if (first) {
-              const decoded = decodeURIComponent(first.replace(/^file:\/{2,3}/i, '').replace(/^file:/i, ''));
-              const name = decoded.split(/[\\/]/).pop() || decoded;
-              setSlot(index, { kind: 'file', text: first, image: '', name });
-              notifyClip(index, '已放入文件');
-              return;
-            }
+            if (storeFileUri(index, uri)) return;
           }
           if (text && text.trim()) {
             const result = classifyClipText(text);
@@ -2036,12 +2164,7 @@ const VV_OPTIONS = [
             const uriType = types.find((type) => type === 'text/uri-list');
             if (uriType) {
               item.getType(uriType).then((blob) => blob.text()).then((uriText) => {
-                const uri = uriText.split(/\r?\n/).map((line) => line.trim()).find((line) => line && line.charAt(0) !== '#');
-                if (!uri) { next(list); return; }
-                let name = decodeURIComponent(uri.replace(/^file:\/{2,3}/i, '').replace(/^file:/i, ''));
-                name = name.split(/[\\/]/).pop() || name;
-                setSlot(index, { kind: 'file', text: uri, image: '', name });
-                notifyClip(index, '已放入文件');
+                if (!storeFileUri(index, uriText)) next(list);
               }).catch(() => next(list));
               return;
             }
@@ -2088,10 +2211,8 @@ const VV_OPTIONS = [
         const slot = readClipSlots()[index];
         if (!slot || (!slot.text && !slot.image)) return;
         if (!slot.image) {
-          /* 文件插原始路径，比 file:// URI 更可读 */
-          const text = slot.kind === 'file'
-            ? decodeURIComponent(slot.text.replace(/^file:\/{2,3}/i, ''))
-            : slot.text;
+          /* 文件插绝对路径（旧数据里的 file:// URI 也会在这里转成路径） */
+          const text = slot.kind === 'file' ? fileUriToPath(slot.text) : slot.text;
           if (insertIntoComposer(text)) notifyClip(index, '已发送');
           else notifyClip(index, '发送失败');
           return;
@@ -2175,7 +2296,8 @@ const VV_OPTIONS = [
             const index = Number(copyArea.getAttribute('data-clip-copy'));
             const slot = readClipSlots()[index];
             if (slot && slot.text && navigator.clipboard && navigator.clipboard.writeText) {
-              navigator.clipboard.writeText(slot.text).then(() => notifyClip(index, '已复制'), () => notifyClip(index, '复制失败'));
+              const copyText = slot.kind === 'file' ? fileUriToPath(slot.text) : slot.text;
+              navigator.clipboard.writeText(copyText).then(() => notifyClip(index, '已复制'), () => notifyClip(index, '复制失败'));
             }
           }
         };
@@ -2862,13 +2984,15 @@ const VV_OPTIONS = [
             const order = dockedIds.indexOf(item.id);
             const chipY = anchorY - 26 >= 4 ? anchorY - 26 : anchorY + 128;
             const chipX = Math.max(4, Math.min(viewport.w - 26, Math.round(anchorX + 176 - 24 - order * 26)));
+            const chipFilled = Boolean(slot.text || slot.image);
             return h('div', {
               key: item.id,
               className: editing ? 'dsh-widget is-editing dsh-clip-chip' : 'dsh-widget dsh-clip-chip',
               'data-widget-id': item.id,
               'data-clip-restore': String(slotIndex),
+              'data-filled': chipFilled ? '' : undefined,
               style: { left: `${chipX}px`, top: `${chipY}px` },
-              title: '恢复剪贴板 ' + (slotIndex + 1),
+              title: (chipFilled ? '恢复剪贴板 ' : '空剪贴板 ') + (slotIndex + 1),
             }, String(slotIndex + 1));
           }
           const size = clipSizes[item.id] || CLIP_DEFAULT_SIZE;
@@ -2960,15 +3084,9 @@ const VV_OPTIONS = [
           );
         }
         const body = item.id === 'balance'
-          ? h('div', { className: 'dsh-widget-balance', style: editing ? { visibility: 'hidden' } : undefined },
-              h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
-              balanceText === null
-                ? h('div', { className: 'dsh-widget-value' }, '--')
-                : h(SevenNumber, { text: balanceText }))
+          ? h(BalanceBody, { text: balanceText, editing })
           : item.id === 'status'
-            ? h('div', { className: 'dsh-widget-balance dsh-widget-status', style: editing ? { visibility: 'hidden' } : undefined },
-                h('div', { className: 'dsh-widget-title' }, 'STATUS / 状态'),
-                h(LiveStatus))
+            ? h(LiveStatus, { editing })
             : h('div', { className: 'dsh-widget-balance', style: editing ? { visibility: 'hidden' } : undefined },
                 h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
                 h(LiveClock));
