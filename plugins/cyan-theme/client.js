@@ -48,12 +48,13 @@ const THEME_DEFAULTS = {
         resolution: 1440,
         density: 100,
         speed: 100,
+        charMode: 'binary',
         scanMode: '2d',
         scanSpeed: 100,
         breathing: { enabled: true, amplitude: 12 },
       },
       logos: { preset: 'default', enabled: true, size: 150, breathing: { enabled: true, amplitude: 12 } },
-      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, breathing: { enabled: true, amplitude: 12 } },
+      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, glance: { enabled: true, expression: true }, breathing: { enabled: true, amplitude: 12 } },
       pointer: {
         light: { enabled: true, brightness: 100, radius: 60 },
         ripple: { enabled: true, brightness: 100, radius: 550, mode: '2d', speed: 100 },
@@ -67,6 +68,7 @@ const THEME_DEFAULTS = {
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
       'vv.live2d': ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"],
       'rain.scanMode': ['2d', '3d'],
+      'rain.charMode': ['binary', 'phosphor'],
       'pointer.ripple.mode': ['2d', '3d'],
     };
     const themeClone = (value) => JSON.parse(JSON.stringify(value));
@@ -120,6 +122,7 @@ const THEME_DEFAULTS = {
       out.rain.resolution = [720, 1080, 1440].includes(rainResolution) ? rainResolution : 1440;
       out.rain.density = Math.round(themeNumber(rain.density, 25, 200, 100));
       out.rain.speed = Math.round(themeNumber(rain.speed, 25, 200, 100));
+      out.rain.charMode = themeOneOf('rain.charMode', rain.charMode, out.rain.charMode);
       out.rain.scanMode = themeOneOf('rain.scanMode', rain.scanMode, out.rain.scanMode);
       out.rain.scanSpeed = Math.round(themeNumber(rain.scanSpeed, 25, 200, 100));
       const gridBreathing = rain.gridBreathing && typeof rain.gridBreathing === 'object' ? rain.gridBreathing : {};
@@ -161,6 +164,11 @@ const THEME_DEFAULTS = {
       out.vv.light = {
         range: Math.round(themeNumber(vvLight.range, 0, 100, 50)),
         strength: Math.round(themeNumber(vvLight.strength, 0, 100, 50)),
+      };
+      const vvGlance = vv.glance && typeof vv.glance === 'object' ? vv.glance : {};
+      out.vv.glance = {
+        enabled: vvGlance.enabled !== false,
+        expression: vvGlance.expression !== false,
       };
       out.vv.breathing = breathing(vv.breathing);
       const pointer = themeGroup(raw, 'pointer');
@@ -299,6 +307,8 @@ const THEME_DEFAULTS = {
       { id: 'vector_1901', label: "VECTOR 1901", group: '动态', thumb: LIVE2D_THUMBS['vector_1901'], fit: 'cover', eye: true, head: true, body: true },
       { id: 'vector_6701_n', label: "VECTOR 6701 N", group: '动态', thumb: LIVE2D_THUMBS['vector_6701_n'], fit: 'cover', eye: true, head: true, body: true },
     ];
+    /* 个别模型暂时没有可用的微表情动作，只保留偷瞄；设置里不显示微表情开关 */
+    const LIVE2D_NO_FACE = { vector_1901: true };
 
 const VV_OPTIONS = [
       { id: 'vv', label: 'VV', group: '静态', thumb: THUMB_VV, fit: 'cover' },
@@ -334,6 +344,10 @@ const VV_OPTIONS = [
     const SCAN_MODE_OPTIONS = [
       { id: '2d', label: '2D' },
       { id: '3d', label: '3D' },
+    ];
+    const RAIN_CHAR_OPTIONS = [
+      { id: 'binary', label: '随机 01' },
+      { id: 'phosphor', label: '全 1 余晖' },
     ];
     const RIPPLE_MODE_OPTIONS = [
       { id: '2d', label: '2D' },
@@ -384,6 +398,13 @@ const VV_OPTIONS = [
       '  --dsw-alias-markdown-code-block-banner: rgba(0, 255, 240, 0.08) !important;',
       '  --dsw-alias-label-deep-diving: #00fff0 !important;',
       '  --dsw-alias-label-deep-diving-shimmer: rgba(232, 255, 254, 0.95) !important;',
+      /* 2.3.1：空状态插画（自动化任务等）默认是灰色系，按主题换成青色层次 */
+      '  --dsw-alias-illustration-background: rgba(0, 255, 240, 0.06) !important;',
+      '  --dsw-alias-illustration-backing: rgba(0, 255, 240, 0.12) !important;',
+      '  --dsw-alias-illustration-surface: rgba(0, 255, 240, 0.16) !important;',
+      '  --dsw-alias-illustration-detail: rgba(0, 255, 240, 0.72) !important;',
+      '  --dsw-alias-illustration-inset: rgba(0, 0, 0, 0.55) !important;',
+      '  --dsw-alias-illustration-shadow: rgba(0, 255, 240, 0.08) !important;',
       '}',
       /* Text selection: subtle theme tint, keep each element's text color. */
       '::selection { background-color: rgba(0, 255, 240, 0.38) !important; color: inherit !important; }',
@@ -403,11 +424,14 @@ const VV_OPTIONS = [
       '@keyframes dsh-thinking-ring { from { box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.70), 0 0 14px rgba(0, 255, 240, 0.14); } to { box-shadow: 0 0 0 1px rgba(0, 255, 240, 1), 0 0 36px rgba(0, 255, 240, 0.50); } }',
       '[data-dsh-composer][data-dsh-thinking] { outline-color: #00fff0 !important; animation: dsh-thinking-ring 3.2s ease-in-out infinite alternate; }',
       '@media (prefers-reduced-motion: reduce) { [data-dsh-composer][data-dsh-thinking] { animation: none; box-shadow: 0 0 0 1px rgba(0, 255, 240, 0.90), 0 0 26px rgba(0, 255, 240, 0.35); } }',
-      /* Send / stop keeps the theme fill and outline; layout is untouched. */
-      '[data-dsh-composer] [class*="primary"] { background-color: rgba(0, 255, 240, 0.20) !important; color: #00fff0 !important; outline: 1px solid rgba(0, 255, 240, 0.85) !important; outline-offset: -1px !important; }',
-      '[data-dsh-composer] [class*="primary"] svg { color: #00fff0 !important; }',
-      '[data-dsh-composer] [class*="primary"]:hover:not(:disabled) { background-color: #00fff0 !important; color: #000 !important; box-shadow: 0 0 14px rgba(0, 255, 240, 0.40) !important; }',
-      '[data-dsh-composer] [class*="primary"]:hover:not(:disabled) svg { color: #000 !important; }',
+      /* Send / stop keeps the theme fill and outline; layout is untouched.
+         2.3.1：同时认宿主自己的 [data-composer-card]，这样“未选择工作区”
+         的空白新会话页（主题的 [data-dsh-composer] 还没标上）也能吃到同一套样式。 */
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"] { background-color: rgba(0, 255, 240, 0.20) !important; color: #00fff0 !important; outline: 1px solid rgba(0, 255, 240, 0.85) !important; outline-offset: -1px !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"] svg { color: #00fff0 !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) { background-color: #00fff0 !important; color: #000 !important; box-shadow: 0 0 14px rgba(0, 255, 240, 0.40) !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) svg { color: #000 !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:disabled { opacity: .55 !important; }',
       /* Selection toolbar ("引用文本"): frosted glass with a cyan hairline.
          The shipped button uses a gray floating fill; the host exposes the
          surface through data-text-interaction-surface, which is stable. */
@@ -468,6 +492,12 @@ const VV_OPTIONS = [
       '[class*="footArea"] { border-top: 1px solid rgba(0, 255, 240, 0.14) !important; }',
       /* Menus and dropdown popups need a visible theme outline. */
       '[role="menu"], [role="listbox"] { outline: 1px solid rgba(0, 255, 240, 0.80) !important; outline-offset: -1px !important; }',
+      /* 2.3.1：配置页的原生 <select> 下拉列表。宿主只用默认白色弹层，
+         这里让 select 走暗色 scheme，并把 option 的黑白反成黑底青字。 */
+      'select { color-scheme: dark !important; }',
+      'select option { background-color: #000 !important; color: #00fff0 !important; }',
+      'select option:checked { background-color: #00fff0 !important; color: #000 !important; }',
+      'select option:hover { background-color: rgba(0, 255, 240, 0.18) !important; color: #00fff0 !important; }',
       /* Settings dropdown/combobox fields: cyan tint instead of gray. */
       '[class*="_panel"]:has([class*="navCell"]) :is(select, [role="combobox"]) { background-color: rgba(0, 255, 240, 0.12) !important; color: #00fff0 !important; }',
       '[class*="themeCube"][class*="selected"] { border-color: rgba(0, 255, 240, 0.70) !important; }',
@@ -485,6 +515,34 @@ const VV_OPTIONS = [
       '[data-plugin-row] { transition: background-color .14s ease; }',
       '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover { background-color: #00fff0 !important; }',
       '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :where(*) { color: #000 !important; }',
+      /* 2.3.1：详情页组件行悬停时，行内代码/id 的深色底条也一起消掉，
+         否则青底上会浮着两条黑条。 */
+      '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :is(code, [class*="rowModule"], [class*="rowId"]) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }',
+      /* 2.3.1：详情页常态下这两行也不该是暗条——直接去掉代码块的深色底。 */
+      '[data-plugin-detail] [data-plugin-row] :is(code, [class*="rowModule"], [class*="rowId"]) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }',
+      /* 2.3.1：插件页（官方插件 / 已安装 bundle 卡片）悬停统一成文字那样的实心青底黑字。
+         原来只有 --dsw-alias-interactive-bg-hover 的淡色底，和详情页的整行高亮不一致。 */
+      '[data-plugin-package], [data-plugin-item] { transition: background-color .14s ease; }',
+      '[data-plugin-package][data-plugin-package]:hover, [data-plugin-item][data-plugin-item]:hover { background-color: #00fff0 !important; }',
+      '[data-plugin-package][data-plugin-package]:hover :where(*), [data-plugin-item][data-plugin-item]:hover :where(*) { color: #000 !important; }',
+      /* 2.3.1：青底上的开关要能看清。宿主开关是 36x20 的胶囊 + 16px 圆点，
+         原本 unchecked 的青色描边底 + 青色圆点会整块融进青底，只剩黑圆点像一块黑方。 */
+      '[data-plugin-package][data-plugin-package]:hover [role="switch"], [data-plugin-item][data-plugin-item]:hover [role="switch"], [data-plugin-row][data-plugin-row]:hover [role="switch"] { background-color: #000 !important; }',
+      '[data-plugin-package][data-plugin-package]:hover [role="switch"] > span, [data-plugin-item][data-plugin-item]:hover [role="switch"] > span, [data-plugin-row][data-plugin-row]:hover [role="switch"] > span, [data-plugin-package][data-plugin-package]:hover [role="switch"] [class*="thumb"], [data-plugin-item][data-plugin-item]:hover [role="switch"] [class*="thumb"], [data-plugin-row][data-plugin-row]:hover [role="switch"] [class*="thumb"] { background-color: #00fff0 !important; }',
+      /* 2.3.1：自动化任务页右栏。宿主的 detail 背景是透明的（bg-base 在这里透底），
+         悬浮组件会从表单底下透出来；给右栏和底栏一层半透明黑底把它们盖住。
+         透明度按用户要求调高；同时把右栏抬到 HUD 组件之上，避免“隔着面板点到剪贴板”。 */
+      '.olCj9W_detail, .olCj9W_saveFooter { background: rgba(0, 0, 0, 0.72) !important; }',
+      /* 页面和右栏都抬一层：HUD 组件在 shell 浮层里，只有同级 stacking context 才能压过去 */
+      '.olCj9W_page { position: relative; z-index: 2; }',
+      '.olCj9W_detail { z-index: 3; }',
+      /* 整行选择按钮悬停时高亮只覆盖按钮盒，容器左右各 12px 留白会露出来；
+         让 ruleRowMenu 向两侧外扩到容器边缘，按钮自然盖满整行。 */
+      '.olCj9W_ruleRows { overflow: hidden; }',
+      '.olCj9W_ruleRows .olCj9W_ruleRowMenu { width: calc(100% + 24px); margin: 0 -12px; }',
+      '.olCj9W_ruleRows .olCj9W_ruleValue { padding: 0 12px; box-sizing: border-box; }',
+      /* 空状态大插画：换成青色后加一点很淡的外发光，和 HUD 一致 */
+      '.olCj9W_emptyIllustration { filter: drop-shadow(0 0 16px rgba(0, 255, 240, 0.14)); }',
       /* Brand logo: 2.2 去掉悬停时的方框描边，只保留一层很淡的高亮和柔光。
          之前的 inset 1px 会贴着 logo 画出一个方块，用户要求不要。 */
       ':is(button, [role="button"])[class*="brand"]:hover { background-color: rgba(0, 255, 240, 0.12) !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.14) !important; }',
@@ -644,6 +702,16 @@ const VV_OPTIONS = [
       '.dsh-widget-status-min .dsh-widget-status-row { gap: 7px; }',
       '.dsh-widget-status-min .dsh-widget-status-now { font-size: 13px; letter-spacing: 0.16em; }',
       '.dsh-widget-status-min .dsh-widget-status-price { font-size: 8px; line-height: 11px; padding: 0 3px; }',
+      /* 2.3.1：时钟 / 余额的极简模式——只留核心读数，去掉标题与副行，数字收小一档 */
+      '.dsh-widget-clock-min, .dsh-widget-balance-min { min-height: 0; padding: 5px 10px; gap: 0; }',
+      '.dsh-widget-clock-min .dsh-seven, .dsh-widget-balance-min .dsh-seven { gap: 2px; }',
+      '.dsh-widget-clock-min .dsh-seg, .dsh-widget-balance-min .dsh-seg { width: 16px; height: 26px; }',
+      '.dsh-widget-clock-min .dsh-colon, .dsh-widget-balance-min .dsh-colon { width: 8px; height: 26px; }',
+      '.dsh-widget-clock-min .dsh-colon::before, .dsh-widget-clock-min .dsh-colon::after, .dsh-widget-balance-min .dsh-colon::before, .dsh-widget-balance-min .dsh-colon::after { left: 1px; width: 4px; height: 4px; }',
+      '.dsh-widget-clock-min .dsh-colon::before, .dsh-widget-balance-min .dsh-colon::before { top: 6px; }',
+      '.dsh-widget-clock-min .dsh-colon::after, .dsh-widget-balance-min .dsh-colon::after { bottom: 6px; }',
+      '.dsh-widget-balance-min .dsh-widget-value { font-size: 18px; }',
+      '.dsh-widget-balance-min .dsh-dot { width: 2px; height: 2px; }',
       '.dsh-widget-date { width: 100%; justify-content: space-between; gap: 0; opacity: 0.72; }',
       '.dsh-widget-date .dsh-seg { width: 11px; height: 18px; }',
       '.dsh-widget-date .dsh-date-space { flex: 0 0 4px; }',
@@ -747,7 +815,7 @@ const VV_OPTIONS = [
       '.dsh-clip-file-icon { flex: none; color: rgba(0, 255, 240, 0.82); }',
       '.dsh-clip-file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
       '.dsh-clip-plus { flex: 1 1 auto; min-height: 28px; display: flex; align-items: center; justify-content: center; padding: 0; background: rgba(0, 255, 240, 0.06); border: 1px dashed rgba(0, 255, 240, 0.45); color: rgba(0, 255, 240, 0.80) !important; font-size: 22px; line-height: 1; cursor: pointer; }',
-      '.dsh-clip-plus:hover { background: rgba(0, 255, 240, 0.16); border-color: rgba(0, 255, 240, 0.75); color: #00fff0 !important; }',
+      '.dsh-clip-plus:hover { background: rgba(0, 255, 240, 0.10); border-color: #00fff0; border-style: solid; color: #00fff0 !important; }',
       '.dsh-clip-bar { flex: none; display: flex; gap: 4px; }',
       /* 三个按钮默认只显示图标，悬停才展开文字 */
       '.dsh-clip-btn { flex: 1 1 0; min-width: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 4px 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.42); color: rgba(0, 255, 240, 0.92) !important; font-size: 11px; line-height: 1; cursor: pointer; transition: background-color .14s ease, flex-grow .16s ease; }',
@@ -852,7 +920,7 @@ const VV_OPTIONS = [
       };
     })();
 
-    function SevenDigit({ value, small = false }) {
+    function SevenDigit({ value, small = false, compact = false }) {
       const sprite = sevenSprite();
       const digit = SEG_DIGITS[value] ? String(value) : '0';
       if (!sprite) {
@@ -865,8 +933,8 @@ const VV_OPTIONS = [
           })),
         );
       }
-      const width = small ? 11 : 22;
-      const height = small ? 18 : 36;
+      const width = small ? 11 : compact ? 16 : 22;
+      const height = small ? 18 : compact ? 26 : 36;
       return h('span', {
         className: 'dsh-seg',
         style: {
@@ -891,7 +959,7 @@ const VV_OPTIONS = [
       );
     }
 
-    function SevenNumber({ text, currency = true, className = '' }) {
+    function SevenNumber({ text, currency = true, className = '', compact = false }) {
       const small = className.indexOf('dsh-widget-date') >= 0;
       const children = currency ? [h(CurrencySymbol, { key: 'currency' })] : [];
       text.split('').forEach((char, index) => {
@@ -907,7 +975,7 @@ const VV_OPTIONS = [
           children.push(h('span', { key: `space${index}`, className: 'dsh-date-space' }));
           return;
         }
-        children.push(h(SevenDigit, { key: `digit${index}`, value: char, small }));
+        children.push(h(SevenDigit, { key: `digit${index}`, value: char, small, compact }));
       });
       return h('div', { className: className ? 'dsh-seven ' + className : 'dsh-seven' }, children);
     }
@@ -939,6 +1007,9 @@ const VV_OPTIONS = [
        写入由每格的“+”按钮手动触发：读系统剪贴板，按内容类型存成
        文本 / 图片 / 文件（本地文件存 URI + 文件名）。 */
     const CLIP3_KEY = 'dsh-exv-clip3.v1';
+    /* 2.3.1：收起/展开状态单独存。原来 docked 写在整块内容里，
+       收一格就要把 20MB 级的图片/长文本重新 stringify + 写盘，单击会顿一下。 */
+    const CLIP_DOCK_KEY = 'dsh-exv-clip-dock.v1';
     const CLIP_SIZE_KEY = 'dsh-exv-clip3-size.v1';
     const CLIP_POS_VERSION_KEY = 'dsh-widget-clip-pos-v1';
     const WIDGET_SCALE_KEY = 'dsh-exv-widget-scale.v1';
@@ -967,6 +1038,17 @@ const VV_OPTIONS = [
       return text;
     };
 
+    const readClipDocks = () => {
+      let raw = null;
+      try {
+        raw = JSON.parse(window.localStorage.getItem(CLIP_DOCK_KEY) || 'null');
+      } catch (error) {
+        raw = null;
+      }
+      if (!Array.isArray(raw)) return null;
+      return CLIP_IDS.map((id, index) => raw[index] === true);
+    };
+
     const readClipSlots = () => {
       let raw = [];
       try {
@@ -974,6 +1056,8 @@ const VV_OPTIONS = [
       } catch (error) {
         raw = [];
       }
+      /* 收起状态优先读独立的小键；旧数据仍从内容里回退读取 */
+      const docks = readClipDocks();
       return CLIP_IDS.map((id, index) => {
         const item = Array.isArray(raw) && raw[index] && typeof raw[index] === 'object' ? raw[index] : {};
         const text = typeof item.text === 'string' ? item.text.slice(0, CLIP_MAX_TEXT) : '';
@@ -985,7 +1069,7 @@ const VV_OPTIONS = [
           image,
           name: typeof item.name === 'string' ? item.name : '',
           at: Number(item.at) || 0,
-          docked: item.docked === true,
+          docked: docks ? docks[index] === true : item.docked === true,
         };
       });
     };
@@ -1010,14 +1094,33 @@ const VV_OPTIONS = [
       return sizes;
     };
 
-    const writeClipSlots = (slots) => {
+    const writeClipDocks = (docks) => {
       try {
-        window.localStorage.setItem(CLIP3_KEY, JSON.stringify(slots));
+        window.localStorage.setItem(CLIP_DOCK_KEY, JSON.stringify(CLIP_IDS.map((id, index) => docks[index] === true)));
       } catch (error) {
         /* 容量满或隐私模式：静默失败 */
       }
+    };
+
+    const writeClipSlots = (slots) => {
       try {
-        window.dispatchEvent(new CustomEvent('dsh-exv-clipboard'));
+        /* 内容里不再重复存 docked：收起状态走独立小键，收一格不必重写大图/长文本 */
+        window.localStorage.setItem(CLIP3_KEY, JSON.stringify(CLIP_IDS.map((id, index) => {
+          const slot = slots[index] || {};
+          return {
+            kind: slot.kind,
+            text: slot.text,
+            image: slot.image,
+            name: slot.name,
+            at: slot.at,
+          };
+        })));
+      } catch (error) {
+        /* 容量满或隐私模式：静默失败 */
+      }
+      writeClipDocks(slots.map((slot) => slot.docked === true));
+      try {
+        window.dispatchEvent(new CustomEvent('dsh-exv-clipboard', { detail: { local: true } }));
       } catch (error) {
         /* ignore */
       }
@@ -1061,9 +1164,13 @@ const VV_OPTIONS = [
     };
 
     /* 把文本送进输入框，失败返回 false 交给调用方兜底 */
+    const composerCardElement = () => document.querySelector('[data-dsh-composer]') || document.querySelector('[data-composer-card]');
+    const composerEditorElement = () => {
+      const card = composerCardElement();
+      return (card || document).querySelector('[contenteditable="true"], textarea');
+    };
     const insertIntoComposer = (text) => {
-      const composer = document.querySelector('[data-dsh-composer]');
-      const editor = (composer || document).querySelector('[contenteditable="true"], textarea');
+      const editor = composerEditorElement();
       if (!editor) return false;
       try {
         editor.focus();
@@ -1082,6 +1189,41 @@ const VV_OPTIONS = [
           selection.addRange(range);
         }
         return document.execCommand('insertText', false, text);
+      } catch (error) {
+        return false;
+      }
+    };
+
+    /* 图片直接送进输入框：先模拟一次带文件的 paste（走宿主自己的附件入口），
+       不行再走 composer 里隐藏的 file input，最后才退回系统剪贴板。
+       dispatchEvent 返回 false 说明 paste 被宿主 preventDefault（即已接住）。 */
+    const pasteImageIntoComposer = (file) => {
+      const editor = composerEditorElement();
+      if (!editor || typeof window.ClipboardEvent !== 'function' || typeof window.DataTransfer !== 'function') return false;
+      try {
+        editor.focus();
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        const event = new ClipboardEvent('paste', {
+          clipboardData: transfer,
+          bubbles: true,
+          cancelable: true,
+        });
+        return editor.dispatchEvent(event) === false;
+      } catch (error) {
+        return false;
+      }
+    };
+    const attachImageToComposer = (file) => {
+      const card = composerCardElement();
+      const input = card ? card.querySelector('input[type="file"]') : null;
+      if (!input || typeof window.DataTransfer !== 'function') return false;
+      try {
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        input.files = transfer.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        return true;
       } catch (error) {
         return false;
       }
@@ -1667,6 +1809,11 @@ const VV_OPTIONS = [
             })),
             sliderRow('密度', config.rain.density, 25, 200, (next) => patch({ rain: { density: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.density),
             sliderRow('下落速度', config.rain.speed, 25, 200, (next) => patch({ rain: { speed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.speed),
+            row('代码雨模式', h(Segmented, {
+              options: RAIN_CHAR_OPTIONS,
+              value: config.rain.charMode,
+              onChange: (id) => patch({ rain: { charMode: id } }),
+            })),
             row('扫描波模式', h(Segmented, {
               options: SCAN_MODE_OPTIONS,
               value: config.rain.scanMode,
@@ -1687,10 +1834,12 @@ const VV_OPTIONS = [
         if (tab === 'vv') {
           const mode = config.vv.mode;
           const vvLight = config.vv.light || { range: 50, strength: 50 };
+          const vvGlance = config.vv.glance || { enabled: true, expression: true };
           const live2dId = config.vv.live2d || 'ar15_4508';
           const live2dOption = LIVE2D_OPTIONS.find((option) => option.id === live2dId) || null;
           const live2dDefaults = LIVE2D_DEFAULTS[live2dId] || { scale: 100, x: 0, y: 0 };
           const live2dCfg = (config.vv.live2dConfig && config.vv.live2dConfig[live2dId]) || { scale: 180, x: -9, y: 52, eye: true };
+          const faceSupported = !LIVE2D_NO_FACE[live2dId];
           const presetCards = mode === 'static'
             ? cardList(VV_OPTIONS.filter((option) => option.group === '静态'), config.vv.preset, (id) => patch({ vv: { mode: 'static', preset: id } }))
             : mode === 'live2d'
@@ -1715,6 +1864,10 @@ const VV_OPTIONS = [
               sliderRow('垂直偏移', live2dCfg.y, live2dDefaults.y - 80, live2dDefaults.y + 80, (next) => patch({ vv: { live2dConfig: { [live2dId]: { y: next } } } }), (value) => `${value}%`, live2dDefaults.y),
               ...(live2dOption && live2dOption.eye !== false ? [
                 row('眼动追踪', h(Switch, { on: live2dCfg.eye, onChange: (next) => patch({ vv: { live2dConfig: { [live2dId]: { eye: next } } } }) })),
+                row('偷瞄', h(Switch, { on: vvGlance.enabled, onChange: (next) => patch({ vv: { glance: { enabled: next } } }) })),
+                ...(vvGlance.enabled && faceSupported ? [
+                  row('微表情', h(Switch, { on: vvGlance.expression, onChange: (next) => patch({ vv: { glance: { expression: next } } }) })),
+                ] : []),
               ] : []),
             ] : []),
             groupTitle('方格照亮'),
@@ -1790,14 +1943,26 @@ const VV_OPTIONS = [
       { id: 'clip-3', label: '剪贴板', group: 'clipboard', storageKey: 'dsh-widget-clip-3-ratio', defaultRatio: { rx: 0.885, ry: 0.78 } },
     ];
 
-    /* 2.2：有多模式的组件。组件编辑列表里悬停该行时，左侧弹出模式子菜单。 */
+    /* 2.2：有多模式的组件。组件编辑列表里悬停该行时，左侧弹出模式子菜单。
+       2.3.1：时钟 / 余额参考峰谷补「完整 / 极简」；剪贴板改成 1/2/3 格模式。 */
     const WIDGET_MODE_KEY = 'dsh-exv-widget-modes.v1';
+    const FULL_MINIMAL_MODES = {
+      defaultMode: 'full',
+      options: [
+        { id: 'full', label: '完整' },
+        { id: 'minimal', label: '极简' },
+      ],
+    };
     const WIDGET_MODES = {
-      status: {
-        defaultMode: 'full',
+      balance: FULL_MINIMAL_MODES,
+      status: FULL_MINIMAL_MODES,
+      clock: FULL_MINIMAL_MODES,
+      'clip-1': {
+        defaultMode: '3',
         options: [
-          { id: 'full', label: '完整' },
-          { id: 'minimal', label: '极简' },
+          { id: '1', label: '1 格' },
+          { id: '2', label: '2 格' },
+          { id: '3', label: '3 格' },
         ],
       },
     };
@@ -1907,11 +2072,11 @@ const VV_OPTIONS = [
       }, []);
       return now;
     }
-    function LiveClock() {
+    function LiveClock({ minimal }) {
       const now = useNowTick();
       return h(React.Fragment, null,
-        h(SevenNumber, { text: clockSnapshot(now), currency: false }),
-        h(SevenNumber, { text: dateSnapshot(now), currency: false, className: 'dsh-widget-date' }));
+        h(SevenNumber, { text: clockSnapshot(now), currency: false, compact: minimal }),
+        minimal ? null : h(SevenNumber, { text: dateSnapshot(now), currency: false, className: 'dsh-widget-date' }));
     }
     /* 峰谷状态：完整模式 = 状态 + 下一状态 + 倒计时数字；极简模式只保留峰谷状态本身。 */
     function LiveStatus({ editing, mode }) {
@@ -1936,7 +2101,7 @@ const VV_OPTIONS = [
        停手 1s 后还原。位宽变化（9.99 → 10.00）直接换值，避免观感错乱。
        2.2：下方一行是本金 / 赠金明细，右边接预测速率；速率为正时右侧挂向下三角；
        余额上涨（充值/赠金到账）时先挂向上三角，等数码管滚到实际金额再收起。 */
-    function BalanceBody({ text, detail, rateText, rateActive, editing }) {
+    function BalanceBody({ text, detail, rateText, rateActive, editing, minimal }) {
       const target = text === null || text === undefined ? '' : String(text);
       const [shown, setShown] = React.useState(target);
       const shownRef = React.useRef(target);
@@ -2008,13 +2173,14 @@ const VV_OPTIONS = [
       }, []);
       const showArrow = trendUp || rateActive;
       return h('div', {
-        className: spending ? 'dsh-widget-balance is-spending' : 'dsh-widget-balance',
+        className: 'dsh-widget-balance' + (minimal ? ' dsh-widget-balance-min' : '') + (spending ? ' is-spending' : ''),
         style: editing ? { visibility: 'hidden' } : undefined,
       },
-        h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
-        shown === '' ? h('div', { className: 'dsh-widget-value' }, '--') : h(SevenNumber, { text: shown }),
-        Array.isArray(detail) && detail.length
-          ? h('div', { className: 'dsh-widget-detail' },
+        minimal ? null : h('div', { className: 'dsh-widget-title' }, 'BALANCE / 余额'),
+        shown === '' ? h('div', { className: 'dsh-widget-value' }, '--') : h(SevenNumber, { text: shown, compact: minimal }),
+        minimal || !Array.isArray(detail) || !detail.length
+          ? null
+          : h('div', { className: 'dsh-widget-detail' },
             detail.map((entry) => h('span', { key: entry.label },
               entry.label + ' ',
               h('b', null, entry.value))),
@@ -2024,8 +2190,7 @@ const VV_OPTIONS = [
                 showArrow
                   ? h('span', { className: 'dsh-widget-arrow', 'data-dir': trendUp ? 'up' : 'down' })
                   : null)
-              : null)
-          : null);
+              : null));
     }
 
     function ThemeEnhancer() {
@@ -2143,6 +2308,14 @@ const VV_OPTIONS = [
       const setWidgetMode = (id, mode) => {
         setWidgetModes((previous) => (previous[id] === mode ? previous : { ...previous, [id]: mode }));
       };
+      /* 2.3.1：剪贴板 1/2/3 格模式。只决定显示几格，不删内容；隐藏的格子原样保留，
+         切回 3 格时内容还在。第 3 格起使用 CLIP_IDS 的原始索引。 */
+      const clipCount = (() => {
+        const value = Number(widgetModes[CLIP_IDS[0]]);
+        return Number.isFinite(value) ? Math.max(1, Math.min(CLIP_IDS.length, Math.round(value))) : CLIP_IDS.length;
+      })();
+      const visibleClipIds = CLIP_IDS.slice(0, clipCount);
+      const widgetMinimal = (id) => Boolean(WIDGET_MODES[id]) && widgetModes[id] === 'minimal';
 
       /* ---- 剪贴板组件状态 ---------------------------------------------- */
       const [clipSlots, setClipSlots] = React.useState(() => readClipSlots());
@@ -2153,13 +2326,22 @@ const VV_OPTIONS = [
       const clipNoticeTimer = React.useRef(0);
       const clipArmTimer = React.useRef(0);
       const clipActionsRef = React.useRef({});
+      const clipSlotsRef = React.useRef(clipSlots);
+      clipSlotsRef.current = clipSlots;
       const clipSizesRef = React.useRef(clipSizes);
       clipSizesRef.current = clipSizes;
       const widgetScalesRef = React.useRef(widgetScales);
       widgetScalesRef.current = widgetScales;
 
+      /* 本组件的写入已经在下面 setState 了：事件只留给外部写入，
+         否则每次收/放一格都会多读一遍大块剪贴板内容、多渲染一次。 */
       React.useEffect(() => {
-        const refresh = () => setClipSlots(readClipSlots());
+        const refresh = (event) => {
+          if (event && event.detail && event.detail.local) return;
+          const next = readClipSlots();
+          clipSlotsRef.current = next;
+          setClipSlots(next);
+        };
         window.addEventListener('dsh-exv-clipboard', refresh);
         return () => {
           window.removeEventListener('dsh-exv-clipboard', refresh);
@@ -2177,7 +2359,13 @@ const VV_OPTIONS = [
         );
       };
 
-      const writeSlots = (slots) => setClipSlots(writeClipSlots(slots));
+      /* 先更新 ref 再 setState：同一帧连点两下也不会基于旧状态互相覆盖 */
+      const commitClipSlots = (next) => {
+        clipSlotsRef.current = next;
+        setClipSlots(next);
+        return next;
+      };
+      const writeSlots = (slots) => commitClipSlots(writeClipSlots(slots));
 
       /* 把内容写进指定的一格（覆盖原有内容） */
       const setSlot = (index, payload) => {
@@ -2328,7 +2516,11 @@ const VV_OPTIONS = [
         }, readText);
       };
 
-      const undockAllClips = () => writeSlots(readClipSlots().map((slot) => ({ ...slot, docked: false })));
+      const undockAllClips = () => {
+        const next = clipSlotsRef.current.map((slot) => ({ ...slot, docked: false }));
+        writeClipDocks(next.map(() => false));
+        commitClipSlots(next);
+      };
 
       const clearClip = (index) => {
         const slots = readClipSlots();
@@ -2337,42 +2529,71 @@ const VV_OPTIONS = [
         notifyClip(index, '已清空');
       };
 
+      const sendImageClip = (index, slot) => {
+        fetch(slot.image)
+          .then((response) => response.blob())
+          .then((blob) => {
+            const type = blob.type || 'image/png';
+            const ext = type.split('/')[1] || 'png';
+            const file = new File([blob], slot.name || ('clipboard-' + Date.now() + '.' + ext), { type });
+            if (pasteImageIntoComposer(file)) {
+              notifyClip(index, '已发送图片');
+              return;
+            }
+            if (attachImageToComposer(file)) {
+              notifyClip(index, '已放入附件');
+              return;
+            }
+            /* 两条附件通道都不可用才退回旧行为：写系统剪贴板让用户自己粘贴 */
+            if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
+              return navigator.clipboard
+                .write([new window.ClipboardItem({ [type]: blob })])
+                .then(() => notifyClip(index, '图片已复制，请 Ctrl+V'), () => notifyClip(index, '发送失败'));
+            }
+            notifyClip(index, '不支持图片');
+            return undefined;
+          })
+          .catch(() => notifyClip(index, '读取图片失败'));
+      };
+
       const sendClip = (index) => {
+        if (clipArmed >= 0) disarmClipPaste();
         const slot = readClipSlots()[index];
         if (!slot || (!slot.text && !slot.image)) return;
-        if (!slot.image) {
-          /* 文件插绝对路径（旧数据里的 file:// URI 也会在这里转成路径） */
-          const text = slot.kind === 'file' ? fileUriToPath(slot.text) : slot.text;
-          if (insertIntoComposer(text)) notifyClip(index, '已发送');
-          else notifyClip(index, '发送失败');
+        if (slot.image) {
+          sendImageClip(index, slot);
           return;
         }
-        /* 图片：写回系统剪贴板，用户自己 Ctrl+V */
-        if (navigator.clipboard && navigator.clipboard.write && window.ClipboardItem) {
-          fetch(slot.image)
-            .then((response) => response.blob())
-            .then((blob) => navigator.clipboard.write([new window.ClipboardItem({ [blob.type]: blob })]))
-            .then(() => notifyClip(index, '图片已复制'), () => notifyClip(index, '复制失败'));
-        } else {
-          notifyClip(index, '不支持图片');
-        }
+        /* 文本 / 文件：插绝对路径（旧数据里的 file:// URI 也会在这里转成路径） */
+        const text = slot.kind === 'file' ? fileUriToPath(slot.text) : slot.text;
+        if (insertIntoComposer(text)) notifyClip(index, '已发送');
+        else notifyClip(index, '发送失败');
       };
 
       const dockClip = (index) => {
-        const slots = readClipSlots();
-        slots[index] = { ...slots[index], docked: true };
-        const next = writeClipSlots(slots);
-        setClipSlots(next);
-        /* 三个都最小化 → 关闭整个组件 */
-        if (next.every((slot) => slot.docked)) {
+        /* 收一格只改 3 个布尔：不读/不写大块内容，单击不再为了一个 docked 字段
+           把整张图片或整段长文本重新序列化。 */
+        const slots = clipSlotsRef.current;
+        if (!slots[index] || slots[index].docked) return;
+        const next = slots.map((slot, position) => (
+          position === index ? { ...slot, docked: true } : slot
+        ));
+        writeClipDocks(next.map((slot) => slot.docked === true));
+        commitClipSlots(next);
+        /* 当前显示的所有格子都最小化 → 关闭整个组件（1 格模式下只这一格） */
+        if (next.slice(0, clipCount).every((slot) => slot.docked)) {
           CLIP_IDS.forEach((id) => setWidgetHidden(id, true));
         }
       };
 
       const restoreClip = (index) => {
-        const slots = readClipSlots();
-        slots[index] = { ...slots[index], docked: false };
-        writeSlots(slots);
+        const slots = clipSlotsRef.current;
+        if (!slots[index] || !slots[index].docked) return;
+        const next = slots.map((slot, position) => (
+          position === index ? { ...slot, docked: false } : slot
+        ));
+        writeClipDocks(next.map((slot) => slot.docked === true));
+        commitClipSlots(next);
       };
 
       /* 恢复默认大小：剪贴板回到 184x148，其它组件回到 1.0 倍 */
@@ -3255,17 +3476,19 @@ const VV_OPTIONS = [
         const y = Math.round(Math.max(0, Math.min(ratio.ry * viewport.h, Math.max(0, viewport.h - 170))));
         if (item.group === 'clipboard') {
           const slotIndex = CLIP_IDS.indexOf(item.id);
+          /* 1/2 格模式下，超出的格子不渲染（内容仍保留在存储里） */
+          if (slotIndex >= clipCount) return null;
           const slot = clipSlots[slotIndex] || { text: '', image: '', at: 0, docked: false };
           if (slot.docked) {
             /* 最小化：变成编号小方块，吸附在第一个还开着的方块上方 */
-            const anchorId = CLIP_IDS.find((id, index) => clipSlots[index] && !clipSlots[index].docked);
+            const anchorId = visibleClipIds.find((id, index) => clipSlots[index] && !clipSlots[index].docked);
             if (!anchorId) return null;
             const anchorRatio = positions[anchorId]
               || (WIDGET_REGISTRY.find((entry) => entry.id === anchorId) || {}).defaultRatio;
             if (!anchorRatio) return null;
             const anchorX = Math.round(Math.max(0, Math.min(anchorRatio.rx * viewport.w, Math.max(0, viewport.w - 310))));
             const anchorY = Math.round(Math.max(0, Math.min(anchorRatio.ry * viewport.h, Math.max(0, viewport.h - 170))));
-            const dockedIds = CLIP_IDS.filter((id, index) => clipSlots[index] && clipSlots[index].docked);
+            const dockedIds = visibleClipIds.filter((id, index) => clipSlots[index] && clipSlots[index].docked);
             const order = dockedIds.indexOf(item.id);
             const chipY = anchorY - 26 >= 4 ? anchorY - 26 : anchorY + 128;
             const chipX = Math.max(4, Math.min(viewport.w - 26, Math.round(anchorX + 176 - 24 - order * 26)));
@@ -3368,6 +3591,7 @@ const VV_OPTIONS = [
             clipNotice.index === slotIndex ? h('div', { className: 'dsh-clip-notice' }, clipNotice.text) : null,
           );
         }
+        const minimal = widgetMinimal(item.id);
         const body = item.id === 'balance'
           ? h(BalanceBody, {
             text: balanceText,
@@ -3375,15 +3599,14 @@ const VV_OPTIONS = [
             rateText: burnRateText,
             rateActive: burnRateActive,
             editing,
+            minimal,
           })
           : item.id === 'status'
             ? h(LiveStatus, { editing, mode: widgetModes.status || 'full' })
-            : h('div', { className: 'dsh-widget-balance dsh-widget-clock', style: editing ? { visibility: 'hidden' } : undefined },
-                h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
-                h(LiveClock));
+            : h('div', { className: 'dsh-widget-balance dsh-widget-clock' + (minimal ? ' dsh-widget-clock-min' : ''), style: editing ? { visibility: 'hidden' } : undefined },
+                minimal ? null : h('div', { className: 'dsh-widget-title' }, 'CLOCK / 时间'),
+                h(LiveClock, { minimal }));
         const widgetScale = widgetScales[item.id] || 1;
-        /* 极简峰谷：一行小卡，编辑态也不再给缩放把手和恢复大小按钮 */
-        const statusMinimal = item.id === 'status' && (widgetModes.status || 'full') === 'minimal';
         return h('div', {
           key: item.id,
           className: editing ? 'dsh-widget is-editing' : 'dsh-widget',
@@ -3391,7 +3614,7 @@ const VV_OPTIONS = [
           style: { left: `${x}px`, top: `${y}px`, willChange: 'transform' },
           title: item.id === 'balance' ? (balanceError || undefined) : undefined,
         },
-          editing && !statusMinimal ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
+          editing && !minimal ? h('button', { type: 'button', className: 'dsh-widget-reset', 'data-widget-reset': '', title: '恢复默认大小' },
             h('svg', { viewBox: '0 0 12 12', 'aria-hidden': 'true' },
               h('path', { d: 'M9.4 4.3A3.9 3.9 0 1 0 9.8 6.8', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }),
               h('path', { d: 'M9.7 1.7V4.5H6.9', fill: 'none', stroke: 'currentColor', strokeWidth: '1.3' }))) : null,
@@ -3409,7 +3632,7 @@ const VV_OPTIONS = [
             editing
               ? h('div', { className: 'dsh-widget-edit' }, h('div', { className: 'dsh-widget-name' }, item.editLabel || item.label))
               : null,
-            editing && !statusMinimal
+            editing && !minimal
               ? h('div', { className: 'dsh-widget-resize', 'data-widget-resize': '', title: '拖动缩放' })
               : null
           )
@@ -3431,46 +3654,61 @@ const VV_OPTIONS = [
           ? createPortal(h(React.Fragment, null, renderedWidgets), floatHost)
           : h(React.Fragment, null, renderedWidgets));
 
-      /* 自检：把当前渲染现场写进 localStorage，出问题可离线排查 */
+      /* 自检：把当前渲染现场写进 localStorage，出问题可离线排查。
+         2.3.1：改成空闲时再量——之前每次收/放剪贴板都会在提交后立刻
+         getBoundingClientRect（强制布局）并写盘，是单击卡顿的一部分。 */
       React.useEffect(() => {
-        try {
-          window.localStorage.setItem('dsh-exv-widget-diag', JSON.stringify({
-            at: new Date().toISOString(),
-            build: '2026-11-08T20:30',
-            editing,
-            tools: toolsPlacement !== null,
-            hidden: hiddenWidgets,
-            visible: WIDGET_REGISTRY.filter((item) => hiddenWidgets.indexOf(item.id) < 0).map((item) => item.id),
-            widgetCount: renderedWidgets.length,
-            floatHost: Boolean(floatHost),
-            errors: window.__dshExvWidgetErrors || [],
-            sizes: clipSizes,
-            positions: CLIP_IDS.map((id) => positions[id] || null),
-            rects: CLIP_IDS.map((id) => {
-              const el = document.querySelector('[data-widget-id="' + id + '"]');
-              if (!el) return null;
-              const r = el.getBoundingClientRect();
-              return {
-                id,
-                x: Math.round(r.left),
-                y: Math.round(r.top),
-                w: Math.round(r.width),
-                h: Math.round(r.height),
-                cls: el.className,
-                pos: window.getComputedStyle(el).position,
-              };
-            }),
-            slots: readClipSlots().map((slot) => ({
-              kind: slot.kind,
-              len: (slot.text || '').length,
-              img: Boolean(slot.image),
-              docked: slot.docked,
-            })),
-            viewport,
-          }));
-        } catch (error) {
-          /* ignore */
-        }
+        let cancelled = false;
+        const flush = () => {
+          if (cancelled) return;
+          try {
+            window.localStorage.setItem('dsh-exv-widget-diag', JSON.stringify({
+              at: new Date().toISOString(),
+              build: '2026-11-08T20:30',
+              editing,
+              tools: toolsPlacement !== null,
+              hidden: hiddenWidgets,
+              visible: WIDGET_REGISTRY.filter((item) => hiddenWidgets.indexOf(item.id) < 0).map((item) => item.id),
+              widgetCount: renderedWidgets.length,
+              floatHost: Boolean(floatHost),
+              errors: window.__dshExvWidgetErrors || [],
+              sizes: clipSizes,
+              positions: CLIP_IDS.map((id) => positions[id] || null),
+              rects: CLIP_IDS.map((id) => {
+                const el = document.querySelector('[data-widget-id="' + id + '"]');
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return {
+                  id,
+                  x: Math.round(r.left),
+                  y: Math.round(r.top),
+                  w: Math.round(r.width),
+                  h: Math.round(r.height),
+                  cls: el.className,
+                  pos: window.getComputedStyle(el).position,
+                };
+              }),
+              slots: clipSlots.map((slot) => ({
+                kind: slot.kind,
+                len: (slot.text || '').length,
+                img: Boolean(slot.image),
+                docked: slot.docked,
+              })),
+              viewport,
+            }));
+          } catch (error) {
+            /* ignore */
+          }
+        };
+        const useIdle = typeof window.requestIdleCallback === 'function';
+        const idle = useIdle
+          ? window.requestIdleCallback(flush, { timeout: 1200 })
+          : window.setTimeout(flush, 400);
+        return () => {
+          cancelled = true;
+          if (useIdle) window.cancelIdleCallback(idle);
+          else window.clearTimeout(idle);
+        };
       }, [editing, hiddenWidgets, clipSlots, clipSizes, floatHost, toolsPlacement !== null, viewport.w, viewport.h]);
 
       return h(React.Fragment, null,

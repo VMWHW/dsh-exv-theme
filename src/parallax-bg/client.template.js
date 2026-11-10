@@ -35,12 +35,13 @@ const THEME_DEFAULTS = {
         resolution: 1440,
         density: 100,
         speed: 100,
+        charMode: 'binary',
         scanMode: '2d',
         scanSpeed: 100,
         breathing: { enabled: true, amplitude: 12 },
       },
       logos: { preset: 'default', enabled: true, size: 150, breathing: { enabled: true, amplitude: 12 } },
-      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, breathing: { enabled: true, amplitude: 12 } },
+      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, glance: { enabled: true, expression: true }, breathing: { enabled: true, amplitude: 12 } },
       pointer: {
         light: { enabled: true, brightness: 100, radius: 60 },
         ripple: { enabled: true, brightness: 100, radius: 550, mode: '2d', speed: 100 },
@@ -54,6 +55,7 @@ const THEME_DEFAULTS = {
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
       'vv.live2d': ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"],
       'rain.scanMode': ['2d', '3d'],
+      'rain.charMode': ['binary', 'phosphor'],
       'pointer.ripple.mode': ['2d', '3d'],
     };
     const themeClone = (value) => JSON.parse(JSON.stringify(value));
@@ -107,6 +109,7 @@ const THEME_DEFAULTS = {
       out.rain.resolution = [720, 1080, 1440].includes(rainResolution) ? rainResolution : 1440;
       out.rain.density = Math.round(themeNumber(rain.density, 25, 200, 100));
       out.rain.speed = Math.round(themeNumber(rain.speed, 25, 200, 100));
+      out.rain.charMode = themeOneOf('rain.charMode', rain.charMode, out.rain.charMode);
       out.rain.scanMode = themeOneOf('rain.scanMode', rain.scanMode, out.rain.scanMode);
       out.rain.scanSpeed = Math.round(themeNumber(rain.scanSpeed, 25, 200, 100));
       const gridBreathing = rain.gridBreathing && typeof rain.gridBreathing === 'object' ? rain.gridBreathing : {};
@@ -148,6 +151,11 @@ const THEME_DEFAULTS = {
       out.vv.light = {
         range: Math.round(themeNumber(vvLight.range, 0, 100, 50)),
         strength: Math.round(themeNumber(vvLight.strength, 0, 100, 50)),
+      };
+      const vvGlance = vv.glance && typeof vv.glance === 'object' ? vv.glance : {};
+      out.vv.glance = {
+        enabled: vvGlance.enabled !== false,
+        expression: vvGlance.expression !== false,
       };
       out.vv.breathing = breathing(vv.breathing);
       const pointer = themeGroup(raw, 'pointer');
@@ -320,6 +328,7 @@ const THEME_DEFAULTS = {
       let height = 0;
       let deviceRatio = 1;
       let strings = [];
+      let lastCharMode = null;
       let raf = 0;
       let last = 0;
       let resizeTimer = 0;
@@ -356,13 +365,18 @@ const THEME_DEFAULTS = {
           const alpha = index === 0 ? 1 : 1 - fade * 0.95;
           squares.push({ alpha, hollow: index === 0 ? false : Math.random() < 0.45 });
         }
+        const y = Math.round((initial ? Math.random() * height : -Math.random() * height * 0.3 - len * STEP) / STEP) * STEP;
         return {
           x: Math.floor(Math.random() * Math.max(1, Math.floor(width / STEP))) * STEP + 6,
-          y: Math.round((initial ? Math.random() * height : -Math.random() * height * 0.3 - len * STEP) / STEP) * STEP,
+          y,
           speed: 90 + Math.random() * 160,
           remainder: 0,
           len,
           squares,
+          /* 2.3.1 荧光屏模式：每串的余晖长度随机，亮度也略有差别 */
+          trailSeconds: 0.6 + Math.random() * 1.9,
+          phosphorAlpha: 0.62 + Math.random() * 0.24,
+          stampRow: Math.round(y / STEP),
         };
       };
 
@@ -955,33 +969,98 @@ const THEME_DEFAULTS = {
         }
       };
 
+      /* 2.3.1 全 1 余晖：头部经过的格子按 2D 扫描波的方式点亮（描边格），
+         每格按自己的 trailSeconds 线性衰减；长度由速度 × 随机余晖时长决定。
+         只在新跨过一行时写一次，画布上不会出现整列同时刷新。 */
+      const stampPhosphor = (string, now) => {
+        const col = Math.round((string.x - 6) / STEP);
+        const row = Math.round(string.y / STEP);
+        const maxCol = Math.floor((width - CELL) / STEP);
+        const maxRow = Math.floor((height - CELL) / STEP);
+        if (col < 0 || col > maxCol) return;
+        if (!Number.isFinite(string.stampRow) || row < string.stampRow) {
+          string.stampRow = row;
+          return;
+        }
+        /* 掉帧/大跳时最多补 16 行，避免一帧点亮一整列 */
+        const from = Math.max(string.stampRow + 1, row - 16);
+        for (let r = from; r <= row; r += 1) {
+          if (r < 0 || r > maxRow) continue;
+          const key = col + ':' + r;
+          const cell = litCells.get(key);
+          if (cell) {
+            cell.t = now;
+            cell.trail = string.trailSeconds;
+            cell.sink = 0;
+            cell.threeD = false;
+            if (string.phosphorAlpha > cell.a) cell.a = string.phosphorAlpha;
+          } else if (litCells.size < LIT_CELL_HARD_CAP) {
+            litCells.set(key, {
+              x: 6 + col * STEP,
+              y: r * STEP,
+              t: now,
+              a: string.phosphorAlpha,
+              trail: string.trailSeconds,
+              sink: 0,
+              threeD: false,
+            });
+          }
+        }
+        string.stampRow = row;
+      };
+
+      /* 随机 01 / 全 1 余晖共用同一份头部：白色实心方块 + 泛光。
+         头部光环排进亮度桶，白色方块和光晕可以在余晖之后最后盖上去。 */
+      const queueHeadLight = (string) => {
+        strokeHalo(string.x + CELL / 2, string.y + CELL / 2, STEP * 2.4, 0.30);
+      };
+      const drawHeadBlock = (string, glow, glowRadius) => {
+        context.drawImage(
+          glow,
+          string.x + CELL / 2 - glowRadius,
+          string.y + CELL / 2 - glowRadius,
+          glowRadius * 2,
+          glowRadius * 2,
+        );
+        context.fillStyle = headPaint(1);
+        context.fillRect(string.x, string.y, CELL, CELL);
+      };
+
       const draw = () => {
         context.clearRect(0, 0, width, height);
         const glow = headGlowSprite();
         const glowRadius = STEP * 2.4;
+        const phosphor = (config().rain || {}).charMode === 'phosphor';
+        const now = performance.now();
+        if (phosphor !== lastCharMode) {
+          /* 切模式不补历史：从当前行开始积累余晖，避免一上来点亮整列 */
+          for (const string of strings) string.stampRow = Math.round(string.y / STEP);
+          lastCharMode = phosphor;
+        }
         for (const string of strings) {
+          if (phosphor) stampPhosphor(string, now);
           for (let index = 0; index < string.len; index += 1) {
             const y = string.y - index * STEP;
             if (y < -CELL || y > height + CELL) continue;
             const square = string.squares[index];
             if (index === 0) {
-              /* The same soft halo as the cursor, centered on the head. */
-              strokeHalo(string.x + CELL / 2, string.y + CELL / 2, STEP * 2.4, 0.30);
-              /* 预渲染的白色光晕代替 shadowBlur：模糊阴影每帧都很贵 */
-              context.drawImage(
-                glow,
-                string.x + CELL / 2 - glowRadius,
-                string.y + CELL / 2 - glowRadius,
-                glowRadius * 2,
-                glowRadius * 2,
-              );
+              queueHeadLight(string);
+              /* 随机 01：头部照旧在当前这一遍画完；全 1 余晖：等余晖画完再盖上去 */
+              if (!phosphor) drawHeadBlock(string, glow, glowRadius);
+              continue;
+            }
+            if (phosphor) {
+              /* 全 1：身体是实心方块，比网格余晖的边框暗一档 */
+              context.fillStyle = paint(square.alpha * 0.52);
+              context.fillRect(string.x, y, CELL, CELL);
+              continue;
             }
             if (square.hollow) {
               context.strokeStyle = paint(square.alpha);
               context.lineWidth = 1.5;
               context.strokeRect(string.x + 0.75, y + 0.75, CELL - 1.5, CELL - 1.5);
             } else {
-              context.fillStyle = index === 0 ? headPaint(1) : paint(square.alpha);
+              context.fillStyle = paint(square.alpha);
               context.fillRect(string.x, y, CELL, CELL);
             }
           }
@@ -996,6 +1075,13 @@ const THEME_DEFAULTS = {
         drawCharacterLight();
         drawWaves(performance.now());
         context.globalCompositeOperation = 'source-over';
+        /* 全 1 余晖：头部最后画，泛光盖住身后的网格边框 */
+        if (phosphor) {
+          for (const string of strings) {
+            if (string.y < -CELL || string.y > height + CELL) continue;
+            drawHeadBlock(string, glow, glowRadius);
+          }
+        }
       };
 
       const tick = (now) => {
@@ -1247,6 +1333,26 @@ const THEME_DEFAULTS = {
       }));
 
       const LIVE2D_CACHE_LIMIT = 2;
+      /* 2.3.1：微表情只碰脸。运行时按模型实际存在的参数建动作池，
+         不支持的参数直接跳过；UMP45 的池子里因此没有眉毛相关。 */
+      const FACE_PARAM_IDS = [
+        'ParamBrowLY', 'ParamBrowRY', 'ParamBrowLForm', 'ParamBrowRForm',
+        'ParamEyeLSmile', 'ParamEyeRSmile', 'ParamMouthForm',
+        'ParamEyeBallX', 'ParamEyeBallY',
+      ];
+      /* 2.3.1 按模型微调：pool 限定可用动作，furrowScale 调整皱眉幅度，
+         invertSmile 用于绑定方向相反的模型。 */
+      const FACE_PROFILES = {
+        ar15_4508: { pool: ['browOne', 'browBoth'] },
+        ar15mod_n: { invertSmile: true },
+        hk416_805: { pool: ['browOne', 'browBoth', 'browFurrow', 'lookAround'], furrowScale: 0.55 },
+        m4a1mod: { pool: ['browFurrow', 'smile', 'lookAround'] },
+        ro635_4504: { pool: ['browFurrow', 'lookAround'] },
+        ro635mod: { pool: ['browOne', 'browBoth', 'lookAround'] },
+        ump45mod_n: { pool: ['lookAround'] },
+        vector_1901: { pool: [] },
+        vector_6701_n: { pool: ['browOne', 'browBoth', 'smile', 'lookAround'] },
+      };
       const live2d = {
         app: null,
         model: null,
@@ -1275,6 +1381,9 @@ const THEME_DEFAULTS = {
            glance 是这一次“看屏幕前的人”的短动作状态。 */
         lastMoveAt: 0,
         glance: { active: false, start: 0, dur: 0, x: 0, y: 0, nextAt: 0 },
+        /* 2.3.1：一次瞟一眼最多带一个微表情 */
+        face: { active: false, model: null, id: '', start: 0, dur: 0, attack: 0, release: 0, side: 'L', dir: 1 },
+        faceLastId: '',
       };
 
       /* Rewrite all file references to data URLs so the model loads without
@@ -1322,22 +1431,154 @@ const THEME_DEFAULTS = {
         );
       };
 
+      const readFaceSupport = (model) => {
+        const support = {};
+        const core = model && model.internalModel && model.internalModel.coreModel;
+        if (!core || typeof core.getParameterIndex !== 'function') return support;
+        for (const id of FACE_PARAM_IDS) {
+          try {
+            const index = core.getParameterIndex(id);
+            if (!Number.isFinite(index) || index < 0) continue;
+            const min = core.getParameterMinimumValue(index);
+            const max = core.getParameterMaximumValue(index);
+            if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) continue;
+            support[id] = { index, min, max };
+          } catch (error) {
+            /* parameter absent */
+          }
+        }
+        return support;
+      };
+
+      const buildFacePool = (support, profile) => {
+        const has = (id) => Boolean(support && support[id]);
+        const pool = [];
+        if (has('ParamBrowLY') || has('ParamBrowRY')) pool.push({ id: 'browOne' });
+        if (has('ParamBrowLY') && has('ParamBrowRY')) pool.push({ id: 'browBoth' });
+        if (has('ParamBrowLForm') || has('ParamBrowRForm')) pool.push({ id: 'browFurrow' });
+        if (has('ParamEyeLSmile') || has('ParamEyeRSmile') || has('ParamMouthForm')) pool.push({ id: 'smile' });
+        if (has('ParamEyeBallX') || has('ParamEyeBallY')) pool.push({ id: 'lookAround' });
+        const allowed = profile && Array.isArray(profile.pool) ? profile.pool : null;
+        return allowed ? pool.filter((entry) => allowed.indexOf(entry.id) >= 0) : pool;
+      };
+
+      const clearGlanceFace = () => {
+        live2d.face.active = false;
+        live2d.face.model = null;
+        live2d.face.id = '';
+      };
+
+      const startGlanceFace = (model, now, enabled) => {
+        clearGlanceFace();
+        if (!enabled || !model) return;
+        const pool = model.__dshFacePool || [];
+        if (pool.length === 0) return;
+        let candidates = pool;
+        if (pool.length > 1 && live2d.faceLastId) {
+          const filtered = pool.filter((item) => item.id !== live2d.faceLastId);
+          if (filtered.length > 0) candidates = filtered;
+        }
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        const support = model.__dshFaceSupport || {};
+        let side = Math.random() < 0.5 ? 'L' : 'R';
+        if (!support.ParamBrowLY && support.ParamBrowRY) side = 'R';
+        if (support.ParamBrowLY && !support.ParamBrowRY) side = 'L';
+        const glance = live2d.glance;
+        const startRatio = 0.26 + Math.random() * 0.10;
+        const maxDur = Math.max(180, glance.dur * (0.94 - startRatio));
+        const wanted = pick.id === 'lookAround'
+          ? 1200 + Math.random() * 300
+          : 900 + Math.random() * 600;
+        live2d.face = {
+          active: true,
+          model,
+          id: pick.id,
+          start: glance.start + glance.dur * startRatio,
+          dur: Math.min(wanted, maxDur),
+          attack: 220,
+          release: 320,
+          side,
+          dir: Math.random() < 0.5 ? -1 : 1,
+        };
+        live2d.faceLastId = pick.id;
+      };
+
+      const faceOffsetsAt = (model, now) => {
+        const face = live2d.face;
+        if (!face.active || face.model !== model) return null;
+        const elapsed = now - face.start;
+        if (elapsed <= 0 || elapsed >= face.dur) return null;
+        const attack = face.attack > 0 ? Math.min(1, elapsed / face.attack) : 1;
+        const release = face.release > 0 ? Math.min(1, (face.dur - elapsed) / face.release) : 1;
+        let weight = Math.min(attack, release);
+        weight = weight * weight * (3 - 2 * weight);
+        const progress = Math.max(0, Math.min(1, elapsed / face.dur));
+        const support = model.__dshFaceSupport || {};
+        const profile = model.__dshFaceProfile || {};
+        const eyeSmileSign = profile.invertSmile === true ? -1 : 1;
+        const mouthSign = profile.invertSmile === true ? -1 : 1;
+        const furrowAmp = 0.45 * (Number.isFinite(profile.furrowScale) ? profile.furrowScale : 1);
+        const out = { params: {}, eyeX: 0, eyeY: 0, headX: 0 };
+        const range = (id) => (support[id] ? support[id].max - support[id].min : 0);
+        const put = (id, delta) => {
+          if (!support[id] || Math.abs(delta) <= 1e-4) return;
+          out.params[id] = delta * weight;
+        };
+        const left = face.side === 'L';
+        if (face.id === 'browOne') {
+          put(left ? 'ParamBrowLY' : 'ParamBrowRY', 0.24 * range(left ? 'ParamBrowLY' : 'ParamBrowRY'));
+          put(left ? 'ParamBrowLForm' : 'ParamBrowRForm', 0.10 * range(left ? 'ParamBrowLForm' : 'ParamBrowRForm'));
+        } else if (face.id === 'browBoth') {
+          put('ParamBrowLY', 0.28 * range('ParamBrowLY'));
+          put('ParamBrowRY', 0.28 * range('ParamBrowRY'));
+          put('ParamBrowLForm', 0.10 * range('ParamBrowLForm'));
+          put('ParamBrowRForm', 0.10 * range('ParamBrowRForm'));
+        } else if (face.id === 'browFurrow') {
+          put('ParamBrowLForm', furrowAmp * range('ParamBrowLForm'));
+          put('ParamBrowRForm', furrowAmp * range('ParamBrowRForm'));
+        } else if (face.id === 'smile') {
+          put('ParamEyeLSmile', eyeSmileSign * 0.70 * range('ParamEyeLSmile'));
+          put('ParamEyeRSmile', eyeSmileSign * 0.70 * range('ParamEyeRSmile'));
+          put('ParamMouthForm', mouthSign * 0.40 * range('ParamMouthForm'));
+        } else if (face.id === 'lookAround') {
+          /* 一次完整的左右环顾：0 → 左 → 右 → 0，眼睛接近鼠标横扫，头也跟着小幅转 */
+          const sweep = Math.sin(progress * Math.PI * 2) * face.dir;
+          out.eyeX = sweep * 0.40 * range('ParamEyeBallX') * weight;
+          out.headX = sweep * 0.50 * weight;
+          out.eyeY = 0;
+        }
+        return out;
+      };
+
       const applyEyeAndHead = (model) => {
         const now = performance.now();
         if (!live2d.lastMoveAt) live2d.lastMoveAt = now;
         const glance = live2d.glance;
-        if (glance.active && now - glance.start >= glance.dur) {
+        const vvConfig = (config && config.vv) || {};
+        const glanceConfig = vvConfig.glance && typeof vvConfig.glance === 'object' ? vvConfig.glance : {};
+        const glanceEnabled = glanceConfig.enabled !== false;
+        const expressionEnabled = glanceConfig.expression !== false;
+        if (!glanceEnabled) {
+          glance.active = false;
+          glance.nextAt = now + 8000;
+          clearGlanceFace();
+        } else if (glance.active && now - glance.start >= glance.dur) {
           glance.active = false;
           glance.nextAt = now + 8000 + Math.random() * 8000;
+          clearGlanceFace();
         } else if (!glance.active && !live2d.head.active
           && now >= glance.nextAt && now - live2d.lastMoveAt > 7000) {
           /* 鼠标安静 7 秒后，每隔 8–16 秒随机瞟一眼屏幕中心：像不经意看屏幕前的人一眼 */
           glance.active = true;
           glance.start = now;
-          glance.dur = 1100 + Math.random() * 1200;
+          glance.dur = 2400 + Math.random() * 2400;
           glance.x = (Math.random() * 2 - 1) * 0.12;
           glance.y = (Math.random() * 2 - 1) * 0.08;
+          startGlanceFace(model, now, expressionEnabled);
+        } else if (!expressionEnabled && live2d.face.active) {
+          clearGlanceFace();
         }
+        if (live2d.face.active && live2d.face.model !== model) clearGlanceFace();
         let baseX = live2d.eyeEnabled ? live2d.focusX : 0;
         let baseY = live2d.eyeEnabled ? live2d.focusY : 0;
         if (glance.active) {
@@ -1361,17 +1602,32 @@ const THEME_DEFAULTS = {
         const applied = model.__dshAppliedOffsets || (model.__dshAppliedOffsets = {});
         const add = (param, value) => {
           try {
+            const info = model.__dshFaceSupport && model.__dshFaceSupport[param];
+            if (info) {
+              const current = core.getParameterValueById(param);
+              const next = Math.min(info.max, Math.max(info.min, current + value));
+              const actual = next - current;
+              if (Math.abs(actual) < 1e-6) return;
+              core.setParameterValueById(param, next);
+              applied[param] = actual;
+              return;
+            }
             core.setParameterValueById(param, core.getParameterValueById(param) + value);
             applied[param] = value;
           } catch (error) { /* parameter absent */ }
         };
-        add('ParamEyeBallX', live2d.eyeX);
-        add('ParamEyeBallY', -live2d.eyeY);
-        add('ParamAngleX', live2d.eyeX * 18 + live2d.head.x * 30);
+        const face = faceOffsetsAt(model, now);
+        const faceHeadX = face ? face.headX : 0;
+        add('ParamEyeBallX', live2d.eyeX + (face ? face.eyeX : 0));
+        add('ParamEyeBallY', -live2d.eyeY + (face ? face.eyeY : 0));
+        add('ParamAngleX', live2d.eyeX * 18 + live2d.head.x * 30 + faceHeadX * 18);
         add('ParamAngleY', -live2d.eyeY * 18 - live2d.head.y * 20);
-        add('ParamAngleZ', live2d.eyeX * 3 + live2d.head.x * 6);
-        add('ParamBodyAngleX', live2d.eyeX * 5 + live2d.head.x * 10);
+        add('ParamAngleZ', live2d.eyeX * 3 + live2d.head.x * 6 + faceHeadX * 3);
+        add('ParamBodyAngleX', live2d.eyeX * 5 + live2d.head.x * 10 + faceHeadX * 5);
         add('ParamBodyAngleY', -live2d.head.y * 6);
+        if (face) {
+          for (const [param, delta] of Object.entries(face.params)) add(param, delta);
+        }
       };
 
       const live2dSettingsUrl = (build) => URL.createObjectURL(new Blob(
@@ -1388,6 +1644,9 @@ const THEME_DEFAULTS = {
         if (!manager) return entry;
         const core = model.internalModel.coreModel;
         model.__dshAppliedOffsets = {};
+        model.__dshFaceSupport = readFaceSupport(model);
+        model.__dshFaceProfile = FACE_PROFILES[id] || {};
+        model.__dshFacePool = buildFacePool(model.__dshFaceSupport, model.__dshFaceProfile);
         const originalMotionUpdate = manager.update.bind(manager);
         manager.update = (...args) => {
           const offsets = model.__dshAppliedOffsets || (model.__dshAppliedOffsets = {});
@@ -1537,6 +1796,8 @@ const THEME_DEFAULTS = {
           live2d.idleTimer = 0;
           if (live2d.model && live2d.model.autoUpdate) live2d.model.autoUpdate = false;
           live2d.app.stop();
+          live2d.glance.active = false;
+          clearGlanceFace();
         }
       };
 
@@ -1659,6 +1920,7 @@ const THEME_DEFAULTS = {
           live2d.glance.active = false;
           live2d.glance.nextAt = live2d.lastMoveAt + 8000 + Math.random() * 8000;
         }
+        if (live2d.face.active) clearGlanceFace();
         live2d.focusX = Math.max(-1, Math.min(1, (event.clientX / window.innerWidth) * 2 - 1));
         live2d.focusY = Math.max(-1, Math.min(1, (event.clientY / window.innerHeight) * 2 - 1));
         if (live2d.head.active) {

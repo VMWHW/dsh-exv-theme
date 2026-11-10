@@ -1,6 +1,6 @@
 {
   "name": "dsh-exv-theme",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "type": "module",
   "description": "Sci-fi cyan HUD theme pack for DeepSeek Harness: layered parallax backdrop, code rain, Live2D characters, and a customizable HUD.",
   "license": "MIT",
@@ -37,9 +37,9 @@
     "url": "https://github.com/VMWHW/dsh-exv-theme/issues"
   },
   "dependencies": {
-    "dsh-exv-cyan-theme": "2.3.0",
-    "dsh-exv-parallax-bg": "2.3.0",
-    "dsh-exv-flat-corners": "2.3.0"
+    "dsh-exv-cyan-theme": "2.3.1",
+    "dsh-exv-parallax-bg": "2.3.1",
+    "dsh-exv-flat-corners": "2.3.1"
   },
   "dsh": {
     "bundle": {
