@@ -19,23 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-## Scope / 适用范围
-
-The MIT license above covers the source code, build scripts and documentation
-written for this project.
-
-It does NOT cover third-party components or character assets embedded in the
-plugin bundles, notably:
-
-- Live2D Cubism Core  (C) 2019 Live2D Inc. — proprietary, "Redistributable Code";
-- pixi.js v6.5.10 — MIT, (C) 2015-2021 Mat Groves / Goodboy Digital;
-- pixi-live2d-cubism4 v1.3.2 — MIT, by guansss;
-- Live2D models and artwork taken from "Girls' Frontline" — (C) Sunborn
-  Network Technology and respective rights holders, used for personal,
-  non-commercial study only.
-
-Those remain the property of their respective owners and are not sublicensed
-under the MIT license. See THIRD_PARTY_NOTICES.md for details.

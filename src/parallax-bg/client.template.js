@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/parallax-bg',
+  id: 'dsh-exv-parallax-bg',
   factory(require) {
     const ASSETS = {
       background: 'data:image/webp;base64,__BACKGROUND__',

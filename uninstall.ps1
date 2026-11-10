@@ -6,11 +6,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $PluginNames = @('flat-corners', 'cyan-theme', 'parallax-bg')
-$BundleNames = @('@local/flat-corners', '@local/cyan-theme', '@local/parallax-bg')
+$BundleNames = @('dsh-exv-flat-corners', 'dsh-exv-cyan-theme', 'dsh-exv-parallax-bg')
+# 2.2.x 用 @local/* 名字；卸载时一并清掉
+$RemovalNames = @($BundleNames) + @('@local/flat-corners', '@local/cyan-theme', '@local/parallax-bg')
 $BackupKeep = 3
 
 function Write-Step([string]$Text) {
-  Write-Host "[DSH EXV 2.0] $Text" -ForegroundColor Cyan
+  Write-Host "[DSH EXV 2.3] $Text" -ForegroundColor Cyan
 }
 
 function Normalize-FullPath([string]$Path) {
@@ -103,11 +105,11 @@ try {
   Copy-Item -LiteralPath $profilePkg -Destination $profileBackup -Force
   $pkg = Get-Content -LiteralPath $profilePkg -Raw | ConvertFrom-Json
   if ($pkg.PSObject.Properties['dsh'] -and $pkg.dsh.PSObject.Properties['profile']) {
-    $kept = @($pkg.dsh.profile.bundles | Where-Object { $BundleNames -notcontains $_ })
+    $kept = @($pkg.dsh.profile.bundles | Where-Object { $RemovalNames -notcontains $_ })
     $pkg.dsh.profile.bundles = @($kept)
   }
   if ($pkg.PSObject.Properties['dependencies']) {
-    foreach ($dep in $BundleNames) {
+    foreach ($dep in $RemovalNames) {
       if ($pkg.dependencies.PSObject.Properties[$dep]) {
         $pkg.dependencies.PSObject.Properties.Remove($dep)
       }
@@ -116,6 +118,16 @@ try {
   Write-JsonAtomically -Path $profilePkg -Data $pkg
   $profileWritten = $true
   Write-Step '已从 profile 移除主题依赖与 bundles'
+
+  # 清掉旧版留在 node_modules\@local 下的联接
+  $legacyScope = Join-Path (Join-Path $profileDir 'node_modules') '@local'
+  foreach ($name in $PluginNames) {
+    $old = Join-Path $legacyScope $name
+    if (Test-Path -LiteralPath $old) {
+      $oldItem = Get-Item -LiteralPath $old -Force
+      if ($oldItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { [IO.Directory]::Delete($old, $false) }
+    }
+  }
 
   # ---- 3. 删除插件目录 ---------------------------------------------------
   foreach ($item in $movedPlugins) {

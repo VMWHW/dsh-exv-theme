@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/flat-corners',
+  id: 'dsh-exv-flat-corners',
   factory(require) {
     const React = require('react');
     const h = React.createElement;

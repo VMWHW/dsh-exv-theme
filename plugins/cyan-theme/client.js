@@ -1,5 +1,5 @@
 window.__ModuleLoader__.load({
-  id: '@local/cyan-theme',
+  id: 'dsh-exv-cyan-theme',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -3491,7 +3491,7 @@ const VV_OPTIONS = [
             return null;
           }
         };
-        ctx.effect(() => ctx.theme.overrideTokens('@local/cyan-theme', tokens));
+        ctx.effect(() => ctx.theme.overrideTokens('dsh-exv-cyan-theme', tokens));
         ctx.effect(() => {
           const onError = (event) => {
             try {

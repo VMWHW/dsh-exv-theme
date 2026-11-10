@@ -1,9 +1,10 @@
 {
-  "name": "@local/parallax-bg",
-  "version": "2.2.0",
-  "private": true,
+  "name": "dsh-exv-parallax-bg",
+  "version": "2.3.0",
   "type": "module",
   "description": "Adaptive layered backdrop with mouse parallax.",
+  "license": "MIT",
+  "author": "VMW_HW",
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
@@ -15,8 +16,25 @@
     "client.js",
     "cordis.patch.yml",
     "locale/*.json",
-    "icon.svg"
+    "icon.svg",
+    "README.md"
   ],
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin",
+    "theme",
+    "live2d",
+    "parallax"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.1 <0.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VMWHW/dsh-exv-theme.git"
+  },
+  "homepage": "https://github.com/VMWHW/dsh-exv-theme",
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

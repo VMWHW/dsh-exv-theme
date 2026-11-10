@@ -36,6 +36,7 @@ const walk = (dir, out = []) => {
 };
 
 const JS_FILES = [
+  'index.js',
   'plugins/cyan-theme/client.js',
   'plugins/flat-corners/client.js',
   'plugins/parallax-bg/index.js',
@@ -44,7 +45,11 @@ const JS_FILES = [
   'src/parallax-bg/client.template.js',
   'tools/build-parallax.mjs',
 ];
-const PLUGINS = ['cyan-theme', 'parallax-bg', 'flat-corners'];
+const PLUGINS = [
+  { dir: 'cyan-theme', name: 'dsh-exv-cyan-theme' },
+  { dir: 'parallax-bg', name: 'dsh-exv-parallax-bg' },
+  { dir: 'flat-corners', name: 'dsh-exv-flat-corners' },
+];
 const IMAGE_TOKENS = [
   '__BACKGROUND__', '__LOGO__', '__WORDMARK__', '__VV__', '__CHIPS__', '__CYBERPUNK__',
   '__STARSKY__', '__FRANKFURT__', '__VV_SCARH__', '__VV_HK416__', '__VV_SCARL__',
@@ -68,24 +73,45 @@ check('json: every json file parses', () => {
 });
 
 check('plugins: manifests and patch files', () => {
-  for (const plugin of PLUGINS) {
-    const manifest = JSON.parse(read(`plugins/${plugin}/package.json`));
-    if (manifest.name !== `@local/${plugin}`) throw new Error(`${plugin}: unexpected name ${manifest.name}`);
-    if (!manifest.dsh || !manifest.dsh.bundle || !manifest.dsh.bundle.patch) throw new Error(`${plugin}: missing dsh.bundle.patch`);
-    if (!fs.existsSync(path.join(ROOT, 'plugins', plugin, manifest.dsh.bundle.patch))) throw new Error(`${plugin}: patch file missing`);
-    if (!manifest.dsh.client || manifest.dsh.client.platform !== 'web') throw new Error(`${plugin}: missing dsh.client.platform`);
-    const patch = read(`plugins/${plugin}/cordis.patch.yml`);
-    if (!patch.includes(`id: ${plugin}`)) throw new Error(`${plugin}: patch does not insert its id`);
+  for (const { dir, name } of PLUGINS) {
+    const manifest = JSON.parse(read(`plugins/${dir}/package.json`));
+    if (manifest.name !== name) throw new Error(`${dir}: unexpected name ${manifest.name}`);
+    if (manifest.private === true) throw new Error(`${dir}: must not be private`);
+    if (!manifest.dsh || !manifest.dsh.bundle || !manifest.dsh.bundle.patch) throw new Error(`${dir}: missing dsh.bundle.patch`);
+    if (!fs.existsSync(path.join(ROOT, 'plugins', dir, manifest.dsh.bundle.patch))) throw new Error(`${dir}: patch file missing`);
+    if (!manifest.dsh.client || manifest.dsh.client.platform !== 'web') throw new Error(`${dir}: missing dsh.client.platform`);
+    const patch = read(`plugins/${dir}/cordis.patch.yml`);
+    if (!patch.includes(`id: ${dir}`)) throw new Error(`${dir}: patch does not insert its id`);
+    if (!patch.includes(`name: '${name}'`)) throw new Error(`${dir}: patch does not name ${name}`);
   }
   return `${PLUGINS.length} plugins`;
+});
+
+check('bundle: repository root is an installable umbrella', () => {
+  const manifest = JSON.parse(read('package.json'));
+  if (manifest.name !== 'dsh-exv-theme') throw new Error('unexpected root name ' + manifest.name);
+  if (manifest.private === true) throw new Error('root package must not be private');
+  if (!manifest.dsh || !manifest.dsh.bundle || !manifest.dsh.bundle.patch) throw new Error('missing dsh.bundle.patch');
+  if (!fs.existsSync(path.join(ROOT, manifest.dsh.bundle.patch))) throw new Error('patch file missing');
+  if (!manifest.engines || typeof manifest.engines.dsh !== 'string') throw new Error('missing engines.dsh');
+  const patch = read(manifest.dsh.bundle.patch);
+  for (const { name } of PLUGINS) {
+    if (!patch.includes(`name: '${name}'`)) throw new Error('root patch does not insert ' + name);
+    if (!manifest.dependencies || manifest.dependencies[name] !== manifest.version) {
+      throw new Error(`${name}: dependency must equal the umbrella version`);
+    }
+  }
+  return '3 rows';
 });
 
 check('versions: VERSION.txt matches every manifest', () => {
   const version = read('VERSION.txt').trim();
   if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error('VERSION.txt is not semver: ' + version);
-  for (const plugin of PLUGINS) {
-    const { version: pluginVersion } = JSON.parse(read(`plugins/${plugin}/package.json`));
-    if (pluginVersion !== version) throw new Error(`${plugin}: ${pluginVersion} != ${version}`);
+  const root = JSON.parse(read('package.json'));
+  if (root.version !== version) throw new Error(`root: ${root.version} != ${version}`);
+  for (const { dir } of PLUGINS) {
+    const { version: pluginVersion } = JSON.parse(read(`plugins/${dir}/package.json`));
+    if (pluginVersion !== version) throw new Error(`${dir}: ${pluginVersion} != ${version}`);
   }
   return version;
 });

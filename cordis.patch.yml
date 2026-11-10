@@ -1,0 +1,7 @@
+- insert:
+    - id: parallax-bg
+      name: 'dsh-exv-parallax-bg'
+    - id: flat-corners
+      name: 'dsh-exv-flat-corners'
+    - id: cyan-theme
+      name: 'dsh-exv-cyan-theme'

@@ -3,6 +3,12 @@
 本仓库**自写的代码**采用 MIT 许可证（见 [LICENSE](LICENSE)）。
 下列第三方组件与素材**不在 MIT 授权范围内**，其版权与使用条件归各自权利人所有。
 
+## 0. 适用范围 / Scope
+
+MIT 只覆盖本项目自写的源代码、构建脚本与文档；**不覆盖**插件产物里内嵌的第三方组件与角色素材，尤其包括：Live2D Cubism Core、pixi.js、pixi-live2d-cubism4，以及《少女前线》的模型与美术素材。它们仍归各自权利人所有，不在 MIT 下再授权。
+
+> 这一段原先附在 LICENSE 末尾，导致 GitHub 把整个仓库识别为 "Other / NOASSERTION"；现在只保留纯 MIT 正文，适用范围放在这里。
+
 ---
 
 ## 1. Live2D Cubism Core

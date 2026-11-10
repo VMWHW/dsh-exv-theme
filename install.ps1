@@ -7,21 +7,21 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$ThemeName = 'DSH EXV Theme 2.0'
+$ThemeName = 'DSH EXV Theme 2.3'
 # 主题依赖宿主的内部结构（data-dsh-* / data-testid / data-slot 共 70 余处），
 # 换 DSH 版本就可能失效。这里只做提示，不阻断：版本不符时需显式 -Force。
 $TestedDshVersion = '0.2.2-rc.1'
 $PluginNames = @('flat-corners', 'cyan-theme', 'parallax-bg')
-$BundleNames = @('@local/flat-corners', '@local/cyan-theme', '@local/parallax-bg')
+$BundleNames = @('dsh-exv-flat-corners', 'dsh-exv-cyan-theme', 'dsh-exv-parallax-bg')
 $DependencyMap = [ordered]@{
-  '@local/flat-corners' = 'flat-corners'
-  '@local/cyan-theme' = 'cyan-theme'
-  '@local/parallax-bg' = 'parallax-bg'
+  'dsh-exv-flat-corners' = 'flat-corners'
+  'dsh-exv-cyan-theme' = 'cyan-theme'
+  'dsh-exv-parallax-bg' = 'parallax-bg'
 }
 $BackupKeep = 3
 
 function Write-Step([string]$Text) {
-  Write-Host "[DSH EXV 2.0] $Text" -ForegroundColor Cyan
+  Write-Host "[DSH EXV 2.3] $Text" -ForegroundColor Cyan
 }
 
 function Write-Note([string]$Text) {
@@ -195,7 +195,10 @@ try {
   if (-not $pkg.dsh.PSObject.Properties['profile']) {
     $pkg.dsh | Add-Member -NotePropertyName profile -NotePropertyValue ([pscustomobject]@{}) -Force
   }
+  # 2.3 起 bundle 名是 dsh-exv-*；先把 2.2.x 的 @local/* 摘掉，避免装了旧版再装新版时同一套样式装两遍。
+  $LegacyBundles = @('@local/flat-corners', '@local/cyan-theme', '@local/parallax-bg')
   $bundles = @($pkg.dsh.profile.bundles)
+  $bundles = @($bundles | Where-Object { $LegacyBundles -notcontains $_ })
   foreach ($bundle in $BundleNames) {
     if ($bundles -notcontains $bundle) { $bundles += $bundle }
   }
@@ -207,6 +210,11 @@ try {
   foreach ($dep in $DependencyMap.Keys) {
     $target = (Join-Path $pluginsDir $DependencyMap[$dep]) -replace '\\', '/'
     $pkg.dependencies | Add-Member -NotePropertyName $dep -NotePropertyValue ("link:" + $target) -Force
+  }
+  foreach ($legacy in $LegacyBundles) {
+    if ($pkg.dependencies.PSObject.Properties[$legacy]) {
+      $pkg.dependencies.PSObject.Properties.Remove($legacy)
+    }
   }
   Write-JsonAtomically -Path $profilePkg -Data $pkg
   $profileWritten = $true
@@ -245,11 +253,20 @@ try {
 
   if (-not $linked) {
     Write-Step '使用目录联接安装插件依赖...'
-    $scope = Join-Path $profileDir 'node_modules\@local'
+    $scope = Join-Path $profileDir 'node_modules'
     New-Item -ItemType Directory -Force -Path $scope | Out-Null
+    # 清掉 2.2.x 留在 node_modules\@local 下的旧联接
+    $legacyScope = Join-Path $scope '@local'
+    foreach ($dir in $DependencyMap.Values) {
+      $old = Join-Path $legacyScope $dir
+      if (Test-Path -LiteralPath $old) {
+        $oldItem = Get-Item -LiteralPath $old -Force
+        if ($oldItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { [IO.Directory]::Delete($old, $false) }
+      }
+    }
     foreach ($dep in $DependencyMap.Keys) {
       $target = Join-Path $pluginsDir $DependencyMap[$dep]
-      $link = Join-Path $scope $DependencyMap[$dep]
+      $link = Join-Path $scope $dep
       if (Test-Path -LiteralPath $link) {
         $item = Get-Item -LiteralPath $link -Force
         if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
@@ -259,6 +276,16 @@ try {
         }
       }
       New-Item -ItemType Junction -Path $link -Target $target | Out-Null
+    }
+  }
+
+  # pnpm 不会删手工联接：把 2.2.x 留在 node_modules\@local 下的旧链接清掉
+  $legacyScope = Join-Path (Join-Path $profileDir 'node_modules') '@local'
+  foreach ($dir in $DependencyMap.Values) {
+    $old = Join-Path $legacyScope $dir
+    if (Test-Path -LiteralPath $old) {
+      $oldItem = Get-Item -LiteralPath $old -Force
+      if ($oldItem.Attributes -band [IO.FileAttributes]::ReparsePoint) { [IO.Directory]::Delete($old, $false) }
     }
   }
 
