@@ -19,6 +19,13 @@ window.__ModuleLoader__.load({
       vvM200: 'data:image/webp;base64,__VV_M200__',
       vvAk74m: 'data:image/webp;base64,__VV_AK74M__',
     };
+    /* 预设缩略图的首次预渲染要用同一份素材：把已经装载好的 data URL 暴露到全局，
+       cyan-theme 打开预设页时据此在本机画一次缩略图（不额外占包体积）。 */
+    try {
+      window.__DSH_EXV_ART__ = ASSETS;
+    } catch (error) {
+      /* 非浏览器环境 */
+    }
 
     const THEME_CONFIG_KEY = 'dsh-exv-theme.config.v1';
     const THEME_VERSION = 3;
@@ -31,8 +38,8 @@ const THEME_DEFAULTS = {
         grid: true,
         gridBrightness: 100,
         gridBreathing: { enabled: true, strength: 50 },
-        fps: 60,
-        resolution: 1440,
+        fps: 30,
+        resolution: 1080,
         density: 100,
         speed: 100,
         charMode: 'binary',

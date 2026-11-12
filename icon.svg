@@ -1,4 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect x="5" y="5" width="54" height="54" fill="#000000" stroke="#00fff0" stroke-width="4"/>
-  <path d="M20 20h24M20 32h18M20 44h24" stroke="#00fff0" stroke-width="4" stroke-linecap="round"/>
+  <!-- EXV 字标（按桌面 EXV.png 逐行量出的几何重画，与源图 IoU 99.36%）。
+       原始画布 764x483，这里等比缩到 64 宽、垂直居中，便于在方形图标位里显示。 -->
+  <g fill="#00ffff" transform="translate(0 11.77) scale(0.08377)">
+    <path d="M0 0 H181 L241 61 H61 V422 H241 L181 483 H0 Z"/>
+    <path d="M584 0 H764 L703 61 H524 Z"/>
+    <path d="M120 212 H233 L262 241.5 L233 271 H120 Z"/>
+    <path d="M174 72 H253 L592 411 H513 Z"/>
+    <path d="M512 72 H591 L461 202 H382 Z"/>
+    <path d="M303 281 H382 L252 411 H173 Z"/>
+    <path d="M524 422 H704 L764 483 H584 Z"/>
+  </g>
 </svg>
