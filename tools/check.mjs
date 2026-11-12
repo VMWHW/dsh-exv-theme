@@ -94,6 +94,13 @@ check('bundle: repository root is an installable umbrella', () => {
   if (!manifest.dsh || !manifest.dsh.bundle || !manifest.dsh.bundle.patch) throw new Error('missing dsh.bundle.patch');
   if (!fs.existsSync(path.join(ROOT, manifest.dsh.bundle.patch))) throw new Error('patch file missing');
   if (!manifest.engines || typeof manifest.engines.dsh !== 'string') throw new Error('missing engines.dsh');
+  // DSH reads bundle display metadata only through package exports: without these,
+  // the umbrella silently falls back to the default artwork and package name.
+  if (!manifest.exports || manifest.exports['./icon'] !== './icon.svg') throw new Error('missing ./icon export');
+  if (!manifest.exports['./locale/*.json']) throw new Error('missing ./locale/*.json export');
+  for (const file of ['icon.svg', 'locale/en.json', 'locale/zh.json']) {
+    if (!fs.existsSync(path.join(ROOT, file))) throw new Error('missing ' + file);
+  }
   const patch = read(manifest.dsh.bundle.patch);
   for (const { name } of PLUGINS) {
     if (!patch.includes(`name: '${name}'`)) throw new Error('root patch does not insert ' + name);
