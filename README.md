@@ -6,6 +6,11 @@ A self-contained sci-fi HUD theme for DeepSeek Harness: black and cyan, parallax
 
 <img width="720" height="405" alt="EXV 开场动画" src="https://github.com/user-attachments/assets/185fe334-082f-4f73-bd4c-030e34a058e4" />
 
+<img width="2560" height="1440" alt="EXV theme screenshot" src="https://github.com/user-attachments/assets/81479d15-ee22-496d-b08e-70d3425adbcf" />
+<img width="1164" height="761" alt="EXV theme screenshot" src="https://github.com/user-attachments/assets/6776baa6-0037-4aa7-81f3-ddfd19eb3fd9" />
+<img width="1164" height="540" alt="EXV theme screenshot" src="https://github.com/user-attachments/assets/ebb79364-d4fb-4806-9ea1-cc9436a773c1" />
+<img width="808" height="809" alt="EXV theme screenshot" src="https://github.com/user-attachments/assets/cb75588d-ba86-4986-bd5e-2e9e56d4cd84" />
+
 ## 安装 / Install
 
 侧边栏 **Plugins → Add plugin**，填入 `dsh-exv-theme`，装完重启 DSH。
