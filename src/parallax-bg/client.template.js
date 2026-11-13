@@ -39,7 +39,7 @@ const THEME_DEFAULTS = {
         gridBrightness: 100,
         gridBreathing: { enabled: true, strength: 50 },
         fps: 30,
-        resolution: 1080,
+        resolution: 1440,
         density: 100,
         speed: 100,
         charMode: 'binary',
@@ -48,7 +48,7 @@ const THEME_DEFAULTS = {
         breathing: { enabled: true, amplitude: 12 },
       },
       logos: { preset: 'default', enabled: true, size: 150, breathing: { enabled: true, amplitude: 12 } },
-      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 120, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, glance: { enabled: true, expression: true }, breathing: { enabled: true, amplitude: 12 } },
+      vv: { mode: 'static', preset: 'vv', live2d: 'ar15_4508', fps: 60, light: { range: 50, strength: 50 }, live2dConfig: {"ar15_4508":{"scale":180,"x":-9,"y":52,"eye":true},"ar15mod_n":{"scale":150,"x":1,"y":59,"eye":true},"hk416_3401_n":{"scale":143,"x":3,"y":45,"eye":true},"hk416_3401_d":{"scale":148,"x":0,"y":33,"eye":true},"hk416_805":{"scale":135,"x":1,"y":37,"eye":true},"hk416mod_n":{"scale":155,"x":2,"y":8,"eye":true},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53,"eye":false},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0,"eye":false},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39,"eye":false},"m4a1mod":{"scale":142,"x":2,"y":49,"eye":true},"ro635_4504":{"scale":139,"x":3,"y":37,"eye":true},"ro635mod":{"scale":146,"x":3,"y":49,"eye":true},"ump45mod_n":{"scale":139,"x":0,"y":40,"eye":true},"vector_1901":{"scale":153,"x":16,"y":60,"eye":true},"vector_6701_n":{"scale":170,"x":5,"y":26,"eye":true}}, staticConfig: { scale: 100, x: 0, y: 0 }, glance: { enabled: true, expression: true }, breathing: { enabled: true, amplitude: 12 } },
       pointer: {
         light: { enabled: true, brightness: 100, radius: 60 },
         ripple: { enabled: true, brightness: 100, radius: 550, mode: '2d', speed: 100 },
@@ -56,7 +56,7 @@ const THEME_DEFAULTS = {
       },
     };
     const THEME_ENUMS = {
-      'background.preset': ['default', 'chips', 'cyberpunk', 'starsky', 'frankfurt'],
+      'background.preset': ['default', 'chips', 'cyberpunk', 'starsky', 'frankfurt', 'darkness'],
       'logos.preset': ['default', 'mark', 'text'],
       'vv.mode': ['none', 'static', 'live2d'],
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
@@ -141,7 +141,7 @@ const THEME_DEFAULTS = {
       out.vv.preset = themeOneOf('vv.preset', vv.preset, out.vv.preset);
       out.vv.live2d = themeOneOf('vv.live2d', vv.live2d, out.vv.live2d);
       const vvFps = Number(vv.fps);
-      out.vv.fps = [30, 60, 90, 120].includes(vvFps) ? vvFps : 120;
+      out.vv.fps = [30, 60, 90, 120].includes(vvFps) ? vvFps : 60;
       const live2dConfig = vv.live2dConfig && typeof vv.live2dConfig === 'object' ? vv.live2dConfig : {};
       out.vv.live2dConfig = {};
       for (const id of ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"]) {
@@ -154,6 +154,12 @@ const THEME_DEFAULTS = {
           eye: item.eye !== false,
         };
       }
+      const vvStatic = vv.staticConfig && typeof vv.staticConfig === 'object' ? vv.staticConfig : {};
+      out.vv.staticConfig = {
+        scale: Math.round(themeNumber(vvStatic.scale, 50, 200, 100)),
+        x: Math.round(themeNumber(vvStatic.x, -50, 50, 0)),
+        y: Math.round(themeNumber(vvStatic.y, -80, 80, 0)),
+      };
       const vvLight = vv.light && typeof vv.light === 'object' ? vv.light : {};
       out.vv.light = {
         range: Math.round(themeNumber(vvLight.range, 0, 100, 50)),
@@ -267,6 +273,11 @@ const THEME_DEFAULTS = {
         image: `url("${ASSETS.frankfurt}")`,
         size: 'cover',
       },
+      /* 纯黑：不贴图，露出 #dsh-parallax 自己的黑底 */
+      darkness: {
+        image: 'none',
+        size: 'cover',
+      },
     };
 
     const VV_PRESETS = {
@@ -303,7 +314,7 @@ const THEME_DEFAULTS = {
       '#dsh-parallax .pl-logo { display: block; width: 150px; height: auto; opacity: 1; filter: drop-shadow(0 0 10px rgba(0, 255, 240, 0.35)); }',
       '#dsh-parallax .pl-wordmark { display: block; width: 150px; height: auto; opacity: 1; }',
       '#dsh-parallax .pl-vv-wrap { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }',
-      '#dsh-parallax .pl-vv { height: 94vh; width: auto; max-width: none; object-fit: contain; opacity: 1; transform: translateY(6vh); filter: drop-shadow(0 0 34px rgba(0, 255, 240, 0.16)); }',
+      '#dsh-parallax .pl-vv { height: calc(94vh * var(--vv-scale, 1)); width: auto; max-width: none; object-fit: contain; opacity: 1; transform-origin: bottom center; transform: translate(calc(var(--vv-x, 0) * 1vw), calc(6vh + var(--vv-y, 0) * 1vh)); filter: drop-shadow(0 0 34px rgba(0, 255, 240, 0.16)); }',
       '#dsh-parallax .pl-live2d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }',
       '#dsh-parallax .pl-press-glow { position: fixed; z-index: 60; left: -999px; top: -999px; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(0, 255, 240, 0.42) 0%, rgba(0, 255, 240, 0.16) 34%, rgba(0, 255, 240, 0.05) 58%, transparent 72%); filter: blur(6px); mix-blend-mode: screen; transition: opacity .12s ease; }',
     ].join('\n');
@@ -1995,6 +2006,11 @@ const THEME_DEFAULTS = {
         }
         const vvImage = VV_PRESETS[next.vv.preset] || VV_PRESETS.vv;
         if (vv.src !== vvImage) vv.src = vvImage;
+        /* 静态主人物的位置与大小（2.5）：100% = 原来的 94vh，x/y 为视口百分比 */
+        const staticCfg = next.vv.staticConfig || { scale: 100, x: 0, y: 0 };
+        vv.style.setProperty('--vv-scale', String(Math.max(0.5, Math.min(2, (Number(staticCfg.scale) || 100) / 100))));
+        vv.style.setProperty('--vv-x', String(Number(staticCfg.x) || 0));
+        vv.style.setProperty('--vv-y', String(Number(staticCfg.y) || 0));
         if (live2d.loaded) layoutLive2D();
       };
 
