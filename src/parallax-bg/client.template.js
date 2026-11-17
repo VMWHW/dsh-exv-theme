@@ -308,8 +308,8 @@ const THEME_DEFAULTS = {
       '#dsh-parallax .pl[data-layer="logos"], #dsh-parallax .pl[data-layer="vv"] { inset: 0; }',
       '#dsh-parallax .pl-bg { position: absolute; inset: 0; background-repeat: no-repeat; background-size: cover; background-position: center; transform: scale(1.06); }',
       '#dsh-parallax .pl-grid { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2722%27%20height=%2722%27%3E%3Crect%20x=%276.75%27%20y=%270.75%27%20width=%2714.5%27%20height=%2714.5%27%20fill=%27none%27%20stroke=%27%2300fff0%27%20stroke-opacity=%270.18%27%20stroke-width=%271.5%27/%3E%3C/svg%3E"); background-size: 22px 22px; transition: opacity .16s ease; }',
-      '#dsh-parallax .pl-rain { position: absolute; inset: 0; }',
-      '#dsh-parallax .pl-rain canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }',
+      '#dsh-parallax .pl-grid-layer, #dsh-parallax .pl-rain-layer { position: absolute; inset: 0; }',
+      '#dsh-parallax .pl-grid-layer canvas, #dsh-parallax .pl-rain-layer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }',
       '#dsh-parallax .pl-logos { position: absolute; top: 64px; right: 36px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; transform-origin: top right; }',
       '#dsh-parallax .pl-logo { display: block; width: 150px; height: auto; opacity: 1; filter: drop-shadow(0 0 10px rgba(0, 255, 240, 0.35)); }',
       '#dsh-parallax .pl-wordmark { display: block; width: 150px; height: auto; opacity: 1; }',
@@ -324,9 +324,14 @@ const THEME_DEFAULTS = {
      * solid opaque square, the body mixes solid and hollow squares at random
      * opacity, and the trailing squares fade out.
      */
-    function startRain(canvas, getConfig, getCharacter) {
-      const context = canvas.getContext('2d');
-      if (!context) return { dispose: () => {}, setEnabled: () => {} };
+    function startRain(canvas, gridCanvas, getConfig, getCharacter) {
+      /* 2.5.0：拆成两层。canvas = 代码雨层（字符/余晖），gridCanvas = 背景网格层
+         （点阵上的点亮、涟漪、扫描波、光照）。两层共用同一套几何常量与画布尺寸，
+         且挂在同一个视差壳里，所以视差、呼吸、缩放之后仍然逐格重合。 */
+      const rainContext = canvas.getContext('2d');
+      const gridContext = gridCanvas.getContext('2d');
+      if (!rainContext || !gridContext) return { dispose: () => {}, setEnabled: () => {} };
+      let context = rainContext;
       const CELL = 16;
       const GAP = 6;
       const STEP = CELL + GAP;
@@ -374,6 +379,14 @@ const THEME_DEFAULTS = {
 
       const config = () => (getConfig ? getConfig() : null) || {};
       const pointerConfig = () => config().pointer || {};
+      const rainOn = () => (config().rain || {}).enabled !== false;
+      const gridOn = () => (config().rain || {}).grid !== false;
+      /* 量坐标统一走可见的那块画布：网格层关掉时指针坐标也没人用，
+         但网格层开着时用它，才能把视差位移算进去。 */
+      const measure = () => {
+        const surface = gridCanvas.clientWidth ? gridCanvas : canvas;
+        return surface.getBoundingClientRect();
+      };
 
       const spawn = (initial) => {
         const len = 14 + Math.floor(Math.random() * 19);
@@ -784,6 +797,7 @@ const THEME_DEFAULTS = {
       /* One-shot startup scan: same grid ring as a click ripple, but it runs
          from the tool cluster to the whole viewport with no distance fade. */
       window.__dshScanWave = (x, y) => {
+        if (!gridOn()) return;
         const w = width || window.innerWidth;
         const h = height || window.innerHeight;
         const diagonal = Math.hypot(w, h);
@@ -815,7 +829,7 @@ const THEME_DEFAULTS = {
       const drawWidgetLight = () => {
         const rects = window.__dshWidgetRects;
         if (!Array.isArray(rects) || rects.length === 0) return;
-        const bounds = canvas.getBoundingClientRect();
+        const bounds = measure();
         const motion = window.__dshWidgetMotion || { x: 0, y: 0 };
         const range = 14;
         for (const source of rects) {
@@ -898,7 +912,7 @@ const THEME_DEFAULTS = {
         const rect = img.getBoundingClientRect();
         if (rect.width < 2 || rect.height < 2) return;
         if (typeof Path2D === 'undefined') return;
-        const bounds = canvas.getBoundingClientRect();
+        const bounds = measure();
         const signature = [
           mask.src, mask.blur,
           Math.round(rect.left), Math.round(rect.top), Math.round(rect.width), Math.round(rect.height),
@@ -957,7 +971,7 @@ const THEME_DEFAULTS = {
         if (!composerThinking || !composerRect) return;
         const rect = composerRect;
         if (rect.width < 40 || rect.height < 20) return;
-        const bounds = canvas.getBoundingClientRect();
+        const bounds = measure();
         const left = rect.left - bounds.left;
         const top = rect.top - bounds.top;
         const right = left + rect.width;
@@ -1030,6 +1044,7 @@ const THEME_DEFAULTS = {
       /* 随机 01 / 全 1 余晖共用同一份头部：白色实心方块 + 泛光。
          头部光环排进亮度桶，白色方块和光晕可以在余晖之后最后盖上去。 */
       const queueHeadLight = (string) => {
+        if (!gridOn()) return;
         strokeHalo(string.x + CELL / 2, string.y + CELL / 2, STEP * 2.4, 0.30);
       };
       const drawHeadBlock = (string, glow, glowRadius) => {
@@ -1045,56 +1060,70 @@ const THEME_DEFAULTS = {
       };
 
       const draw = () => {
-        context.clearRect(0, 0, width, height);
-        const glow = headGlowSprite();
-        const glowRadius = STEP * 2.4;
-        const phosphor = (config().rain || {}).charMode === 'phosphor';
+        const rainCfg = config().rain || {};
+        const showRain = rainOn();
+        const showGrid = gridOn();
         const now = performance.now();
-        if (phosphor !== lastCharMode) {
-          /* 切模式不补历史：从当前行开始积累余晖，避免一上来点亮整列 */
-          for (const string of strings) string.stampRow = Math.round(string.y / STEP);
-          lastCharMode = phosphor;
-        }
-        for (const string of strings) {
-          if (phosphor) stampPhosphor(string, now);
-          for (let index = 0; index < string.len; index += 1) {
-            const y = string.y - index * STEP;
-            if (y < -CELL || y > height + CELL) continue;
-            const square = string.squares[index];
-            if (index === 0) {
-              queueHeadLight(string);
-              /* 随机 01：头部照旧在当前这一遍画完；全 1 余晖：等余晖画完再盖上去 */
-              if (!phosphor) drawHeadBlock(string, glow, glowRadius);
-              continue;
-            }
-            if (phosphor) {
-              /* 全 1：身体是实心方块，比网格余晖的边框暗一档 */
-              context.fillStyle = paint(square.alpha * 0.52);
-              context.fillRect(string.x, y, CELL, CELL);
-              continue;
-            }
-            if (square.hollow) {
-              context.strokeStyle = paint(square.alpha);
-              context.lineWidth = 1.5;
-              context.strokeRect(string.x + 0.75, y + 0.75, CELL - 1.5, CELL - 1.5);
-            } else {
-              context.fillStyle = paint(square.alpha);
-              context.fillRect(string.x, y, CELL, CELL);
+        const glow = showRain ? headGlowSprite() : null;
+        const glowRadius = STEP * 2.4;
+        /* ---- 代码雨层：字符、余晖、荧光屏灯 ---- */
+        context = rainContext;
+        context.clearRect(0, 0, width, height);
+        let phosphor = false;
+        if (showRain) {
+          phosphor = rainCfg.charMode === 'phosphor';
+          if (phosphor !== lastCharMode) {
+            /* 切模式不补历史：从当前行开始积累余晖，避免一上来点亮整列 */
+            for (const string of strings) string.stampRow = Math.round(string.y / STEP);
+            lastCharMode = phosphor;
+          }
+          for (const string of strings) {
+            if (phosphor && showGrid) stampPhosphor(string, now);
+            for (let index = 0; index < string.len; index += 1) {
+              const y = string.y - index * STEP;
+              if (y < -CELL || y > height + CELL) continue;
+              const square = string.squares[index];
+              if (index === 0) {
+                queueHeadLight(string);
+                /* 随机 01：头部照旧在当前这一遍画完；全 1 余晖：等余晖画完再盖上去 */
+                if (!phosphor) drawHeadBlock(string, glow, glowRadius);
+                continue;
+              }
+              if (phosphor) {
+                /* 全 1：身体是实心方块，比网格余晖的边框暗一档 */
+                context.fillStyle = paint(square.alpha * 0.52);
+                context.fillRect(string.x, y, CELL, CELL);
+                continue;
+              }
+              if (square.hollow) {
+                context.strokeStyle = paint(square.alpha);
+                context.lineWidth = 1.5;
+                context.strokeRect(string.x + 0.75, y + 0.75, CELL - 1.5, CELL - 1.5);
+              } else {
+                context.fillStyle = paint(square.alpha);
+                context.fillRect(string.x, y, CELL, CELL);
+              }
             }
           }
         }
-        context.shadowBlur = 0;
-        context.globalCompositeOperation = 'lighter';
-        drawPointerLight();
-        drawPointerPressLight();
-        drawWidgetLight();
-        drawComposerLight(performance.now());
-        flushLightCells();
-        drawCharacterLight();
-        drawWaves(performance.now());
-        context.globalCompositeOperation = 'source-over';
-        /* 全 1 余晖：头部最后画，泛光盖住身后的网格边框 */
-        if (phosphor) {
+        /* ---- 背景网格层：点亮、涟漪、扫描波、各种照明 ---- */
+        context = gridContext;
+        context.clearRect(0, 0, width, height);
+        if (showGrid) {
+          context.shadowBlur = 0;
+          context.globalCompositeOperation = 'lighter';
+          drawPointerLight();
+          drawPointerPressLight();
+          drawWidgetLight();
+          drawComposerLight(now);
+          flushLightCells();
+          drawCharacterLight();
+          drawWaves(now);
+          context.globalCompositeOperation = 'source-over';
+        }
+        /* 全 1 余晖：白色头部最后盖在代码雨层上 */
+        if (showRain && phosphor) {
+          context = rainContext;
           for (const string of strings) {
             if (string.y < -CELL || string.y > height + CELL) continue;
             drawHeadBlock(string, glow, glowRadius);
@@ -1106,21 +1135,25 @@ const THEME_DEFAULTS = {
         try {
           if (window.__dshExvDebug) window.__dshExvDebug.rainFrames += 1;
           const rainCfg = config().rain || {};
-          const fps = Math.max(1, Math.min(60, Number(rainCfg.fps) || 60));
+          const showRain = rainOn();
+          /* 只开网格时提到 60fps：光标照明/涟漪是 fps 敏感的，30fps 会明显发抖 */
+          const fps = showRain ? Math.max(1, Math.min(60, Number(rainCfg.fps) || 60)) : 60;
           if (!lastFrame || now - lastFrame >= 1000 / fps - 0.5) {
             lastFrame = now;
             const speedScale = Math.max(0.25, Math.min(2, (Number(rainCfg.speed) || 100) / 100));
             const delta = last ? Math.min(0.06, (now - last) / 1000) : 0.016;
             last = now;
-            for (const string of strings) {
-              string.remainder += string.speed * speedScale * delta;
-              if (string.remainder >= STEP) {
-                const steps = Math.floor(string.remainder / STEP);
-                string.y += steps * STEP;
-                string.remainder -= steps * STEP;
-              }
-              if (string.y - string.len * STEP > height) {
-                Object.assign(string, spawn(false));
+            if (showRain) {
+              for (const string of strings) {
+                string.remainder += string.speed * speedScale * delta;
+                if (string.remainder >= STEP) {
+                  const steps = Math.floor(string.remainder / STEP);
+                  string.y += steps * STEP;
+                  string.remainder -= steps * STEP;
+                }
+                if (string.y - string.len * STEP > height) {
+                  Object.assign(string, spawn(false));
+                }
               }
             }
             draw();
@@ -1156,16 +1189,20 @@ const THEME_DEFAULTS = {
       };
 
       const resize = () => {
-        width = canvas.clientWidth || window.innerWidth;
-        height = canvas.clientHeight || window.innerHeight;
+        width = canvas.clientWidth || gridCanvas.clientWidth || window.innerWidth;
+        height = canvas.clientHeight || gridCanvas.clientHeight || window.innerHeight;
         const rainCfg = config().rain || {};
         const cap = [720, 1080, 1440].includes(Number(rainCfg.resolution)) ? Number(rainCfg.resolution) : 1440;
         resolution = cap;
         const ratio = Math.max(0.25, Math.min(window.devicePixelRatio || 1, 2, cap / Math.max(1, height)));
-        canvas.width = Math.round(width * ratio);
-        canvas.height = Math.round(height * ratio);
+        /* 两块画布用同一份尺寸/缩放，保证两层逐像素对齐 */
+        for (const surface of [canvas, gridCanvas]) {
+          surface.width = Math.round(width * ratio);
+          surface.height = Math.round(height * ratio);
+          const surfaceContext = surface.getContext('2d');
+          if (surfaceContext) surfaceContext.setTransform(ratio, 0, 0, ratio, 0, 0);
+        }
         deviceRatio = ratio;
-        context.setTransform(ratio, 0, 0, ratio, 0, 0);
         strings = [];
         syncStringCount();
         draw();
@@ -1182,16 +1219,18 @@ const THEME_DEFAULTS = {
       };
 
       const onPointerMove = (event) => {
-        const rect = canvas.getBoundingClientRect();
+        const rect = measure();
         pointer.x = event.clientX - rect.left;
         pointer.y = event.clientY - rect.top;
       };
       const onPointerDown = (event) => {
         if (event.button !== 0 && event.button !== 2) return;
         if (event.button === 0) pressing = true;
+        /* 网格层关掉时没有可点亮的格子：别把涟漪堆在数组里 */
+        if (!gridOn()) return;
         const ripple = pointerConfig().ripple;
         if (ripple && ripple.enabled === false) return;
-        const rect = canvas.getBoundingClientRect();
+        const rect = measure();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
         const born = performance.now();
@@ -1292,14 +1331,20 @@ const THEME_DEFAULTS = {
       bg.className = 'pl-bg';
       background.appendChild(bg);
 
+      /* 2.5.0：网格层与代码雨层分开，但都挂在这一个 .pl 壳里 —— 同一个视差深度、
+         同一个 transform，所以两层永远逐格重合。 */
       const rain = layer('rain', 14);
+      const gridLayer = document.createElement('div');
+      gridLayer.className = 'pl-grid-layer';
       const grid = document.createElement('div');
       grid.className = 'pl-grid';
-      const rainInner = document.createElement('div');
-      rainInner.className = 'pl-rain';
+      const gridCanvas = document.createElement('canvas');
+      gridLayer.append(grid, gridCanvas);
+      const rainLayer = document.createElement('div');
+      rainLayer.className = 'pl-rain-layer';
       const canvas = document.createElement('canvas');
-      rainInner.appendChild(canvas);
-      rain.append(grid, rainInner);
+      rainLayer.appendChild(canvas);
+      rain.append(gridLayer, rainLayer);
 
       const logos = layer('logos', 22);
       const logoInner = document.createElement('div');
@@ -1338,7 +1383,7 @@ const THEME_DEFAULTS = {
       const store = window.__DSH_EXV__;
       let config = store ? store.get() : null;
 
-      const rainControl = startRain(canvas, () => config, () => (config && config.vv.mode !== 'none' ? vv : null));
+      const rainControl = startRain(canvas, gridCanvas, () => config, () => (config && config.vv.mode !== 'none' ? vv : null));
 
       const strengths = { bg: 8, rain: 16, logos: 18, vv: 48 };
       const damping = { bg: 0.05, rain: 0.07, logos: 0.14, vv: 0.035 };
@@ -1978,12 +2023,13 @@ const THEME_DEFAULTS = {
         const preset = BACKGROUND_PRESETS[next.background.preset] || BACKGROUND_PRESETS.default;
         bg.style.backgroundImage = preset.image;
         bg.style.backgroundSize = preset.size;
-        rainInner.style.display = next.rain.enabled ? '' : 'none';
-        rainControl.setEnabled(next.rain.enabled);
+        /* 2.5.0：两层各管各的开关；循环只要有一层开着就继续跑 */
+        rainLayer.style.display = next.rain.enabled ? '' : 'none';
+        gridLayer.style.display = next.rain.grid ? '' : 'none';
+        rainControl.setEnabled(next.rain.enabled || next.rain.grid);
         rainControl.setResolution(next.rain.resolution);
         rainControl.setDensity(next.rain.density);
         applyLive2DFps();
-        grid.style.display = next.rain.enabled && next.rain.grid ? '' : 'none';
         logoInner.style.display = next.logos.enabled ? '' : 'none';
         logoInner.style.transform = `scale(${next.logos.size / 150})`;
         logo.style.display = next.logos.preset === 'text' ? 'none' : '';
@@ -2076,7 +2122,7 @@ const THEME_DEFAULTS = {
         let widgetX = 0;
         let widgetY = 0;
         const rainConfig = config && config.rain ? config.rain : null;
-        if (rainConfig && rainConfig.enabled && rainConfig.grid && time - gridLast >= 0.1) {
+        if (rainConfig && rainConfig.grid && time - gridLast >= 0.1) {
           gridLast = time;
           const strength = rainConfig.gridBreathing && rainConfig.gridBreathing.enabled !== false ? rainConfig.gridBreathing.strength / 100 : 0;
           const phase = 1 - 0.5 * strength * (0.5 - 0.5 * Math.cos(time * (Math.PI * 2 / 6)));

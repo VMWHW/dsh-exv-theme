@@ -306,6 +306,28 @@ const THEME_DEFAULTS = {
       return () => { bootPrefListeners.delete(listener); };
     };
 
+    /* 2.5.0：打开模式后按钮是否自动缩回（默认开）。关掉后保持展开，
+       使用者自己决定要不要让展开的按钮挡住下面的东西。独立 localStorage 键。 */
+    const TOOLS_AUTORETRACT_KEY = 'dsh-exv-tools-autoretract';
+    const toolsAutoRetractListeners = new Set();
+    const isToolsAutoRetract = () => {
+      try { return window.localStorage.getItem(TOOLS_AUTORETRACT_KEY) !== 'off'; } catch (error) { return true; }
+    };
+    const setToolsAutoRetract = (on) => {
+      try {
+        if (on) window.localStorage.removeItem(TOOLS_AUTORETRACT_KEY);
+        else window.localStorage.setItem(TOOLS_AUTORETRACT_KEY, 'off');
+      } catch (error) { /* ignore */ }
+      toolsAutoRetractListeners.forEach((listener) => {
+        try { listener(Boolean(on)); } catch (error) { /* 单个订阅失败不影响其它 */ }
+      });
+    };
+    const subscribeToolsAutoRetract = (listener) => {
+      if (typeof listener !== 'function') return () => {};
+      toolsAutoRetractListeners.add(listener);
+      return () => { toolsAutoRetractListeners.delete(listener); };
+    };
+
     /* env: { canvas, freeze, exposeRender, onEnd } —— 预览页和主题共用这一份 */
     function bootOverlayRun(env) {
       const canvas = env.canvas;
@@ -861,6 +883,8 @@ resize();
       canvas.style.cssText = 'display:block;width:100%;height:100%';
       host.appendChild(canvas);
       (document.body || document.documentElement).appendChild(host);
+      /* 增强包（dsh-exv-theme-plus）用来判断基座是否已经在播 */
+      window.__DSH_EXV_BOOT_ACTIVE__ = true;
 
       let closed = false;
       const teardown = [];
@@ -868,6 +892,7 @@ resize();
       const close = () => {
         if (closed) return;
         closed = true;
+        window.__DSH_EXV_BOOT_ACTIVE__ = false;
         teardown.forEach((fn) => { try { fn(); } catch (error) { /* ignore */ } });
         teardown.length = 0;
         try { if (handle) handle.finish(); } catch (error) { /* ignore */ }
@@ -922,10 +947,12 @@ resize();
     const maybeStartBoot = () => {
       try {
         if (window.__DSH_EXV_BOOT_PLAYED__) return;
+        if (window.__DSH_EXV_BOOT_OWNER__) return; /* 增强包（dsh-exv-theme-plus）接管开场 */
         if (!isBootEnabled()) return;
         if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        window.__DSH_EXV_BOOT_PLAYED__ = true;
         window.requestAnimationFrame(() => {
+          if (window.__DSH_EXV_BOOT_OWNER__) return; /* 同一帧内后到的增强包也要让位 */
+          window.__DSH_EXV_BOOT_PLAYED__ = true;
           try { createBootOverlay({}); } catch (error) { /* ignore */ }
         });
       } catch (error) { /* ignore */ }
@@ -1427,7 +1454,7 @@ const VV_OPTIONS = [
       '.dsh-widget-reset svg { display: block; width: 11px; height: 11px; }',
       '.dsh-widget-reset:hover { background: #00fff0 !important; color: #000 !important; }',
       '@keyframes dsh-widget-list-in { from { opacity: 0; transform: translateY(8px) scaleY(0.88); } to { opacity: 1; transform: translateY(0) scaleY(1); } }',
-      '.dsh-widget-list { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 2; box-sizing: border-box; width: 138px; padding: 4px; display: flex; flex-direction: column; gap: 1px; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); transform-origin: bottom right; animation: dsh-widget-list-in .18s ease-out; }',
+      '.dsh-widget-list { position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 2; box-sizing: border-box; width: 138px; padding: 4px; display: flex; flex-direction: column; gap: 1px; background: rgba(0, 0, 0, 0.82); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 18px rgba(0, 255, 240, 0.18); transform-origin: bottom right; animation: dsh-widget-list-in .18s ease-out; pointer-events: auto; }',
       '.dsh-widget-list-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 7px; font-size: 11px; letter-spacing: 0.08em; color: rgba(0, 255, 240, 0.88) !important; cursor: pointer; user-select: none; }',
       '.dsh-widget-list-row:hover { background: rgba(0, 255, 240, 0.12); color: #00fff0 !important; }',
       '.dsh-widget-list-row[data-hidden] { color: rgba(0, 255, 240, 0.42) !important; }',
@@ -1451,17 +1478,24 @@ const VV_OPTIONS = [
       'body[data-dsh-desktop] [data-slot="conversation.chat.flow"], body[data-dsh-desktop] [data-slot="conversation.chat"] { display: none !important; }',
       'body[data-dsh-desktop] [data-chat-flow-kind], body[data-dsh-desktop] [class*="_markdown_"] { display: none !important; }',
       'body[data-dsh-desktop] :is(button, a, input, textarea, select, [contenteditable="true"], [data-dsh-composer]) { cursor: auto; }',
-      '.dsh-tools { position: fixed; z-index: 61; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: auto; }',
-      '.dsh-tool-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }',
-      '.dsh-tool-hint { flex: none; white-space: nowrap; pointer-events: none; color: rgba(0, 255, 240, 0.38); font-size: 11px; letter-spacing: 0.06em; transition: opacity .18s ease; }',
-      '.dsh-tool-row:hover .dsh-tool-hint, .dsh-tool-row:has(.dsh-tool[data-active]) .dsh-tool-hint { opacity: 0; }',
-      '.dsh-tool { width: 30px; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 7px; overflow: hidden; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(0, 255, 240, 0.60); color: #00fff0 !important; cursor: pointer; transition: width .18s ease, background-color .18s ease, filter .08s ease; }',
+      '.dsh-tools { position: fixed; z-index: 61; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; pointer-events: none; }',
+      '.dsh-tool-row { display: flex; align-items: center; justify-content: flex-end; gap: 6px; pointer-events: none; }',
+      '.dsh-tool-hint { position: absolute; right: 0; top: calc(100% + 6px); white-space: nowrap; pointer-events: none; color: rgba(0, 255, 240, 0.55); font-size: 11px; letter-spacing: 0.06em; opacity: 0; transform: translateY(-4px); transition: opacity .18s ease, transform .18s ease; }',
+      '.dsh-tool-row:hover ~ .dsh-tool-hint { opacity: 1; transform: translateY(0); }',
+      '.dsh-tools[data-desktop="1"] .dsh-tool-hint, .dsh-tools[data-hint-muted="1"] .dsh-tool-hint { opacity: 0; transform: translateY(-4px); }',
+      '.dsh-tool { position: relative; width: 30px; height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 7px; overflow: hidden; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(0, 255, 240, 0.60); color: #00fff0 !important; cursor: pointer; pointer-events: auto; transition: width .18s ease, background-color .18s ease, filter .08s ease; }',
       '.dsh-tool svg { flex: none; width: 16px; height: 16px; }',
-      '.dsh-tool:hover, .dsh-tool[data-active] { width: 138px; }',
       '.dsh-tool:active { filter: brightness(0.70); }',
       '.dsh-tool[data-active] { background: #00fff0; border-color: #00fff0; color: #000 !important; box-shadow: 0 0 16px rgba(0, 255, 240, 0.70); }',
-      '.dsh-tool-label { flex: none; white-space: nowrap; font-size: 12px; letter-spacing: 0.08em; opacity: 0; transition: opacity .18s ease; }',
-      '.dsh-tool:hover .dsh-tool-label, .dsh-tool[data-active] .dsh-tool-label { opacity: 1; }',
+      /* 2.5.0：悬停展开（打开模式下重新悬停也会展开）；自动缩回开着时，点击后
+         到下一次重新悬停前不再展开。容器本身不接指针，所以三小只没占住的地方
+         （比如发送键）照常可点。 */
+      '.dsh-tool:hover:not([data-hover-muted]) { width: 138px; }',
+      '.dsh-tool-label { flex: none; white-space: nowrap; font-size: 12px; letter-spacing: 0.08em; opacity: 0; transform: translateY(6px); transition: opacity .16s ease, transform .16s ease; }',
+      '.dsh-tool:hover:not([data-hover-muted]) .dsh-tool-label { opacity: 1; transform: translateY(0); }',
+      /* 「按钮自动缩回」关掉：打开模式后保持展开（旧行为），要不要挡住下面由使用者决定 */
+      '.dsh-tools[data-autoretract="0"] .dsh-tool[data-active] { width: 138px; }',
+      '.dsh-tools[data-autoretract="0"] .dsh-tool[data-active] .dsh-tool-label { opacity: 1; transform: translateY(0); }',
       /* Background editor: settings-style glass sheet. */
       '.dsh-bg-overlay { position: fixed; inset: 0; z-index: 2147482000; pointer-events: none; background: transparent; }',
       '.dsh-bg-panel { position: fixed; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; width: min(1160px, calc(100vw - 80px)); max-height: min(80vh, 760px); padding: 18px 20px 16px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(0, 255, 240, 0.55); box-shadow: 0 0 32px rgba(0, 255, 240, 0.18); backdrop-filter: blur(20px) saturate(1.15); -webkit-backdrop-filter: blur(20px) saturate(1.15); color: #00fff0; }',
@@ -1492,9 +1526,9 @@ const VV_OPTIONS = [
       '.dsh-bg-card:not([data-thumb]):hover:not([data-disabled]) .dsh-bg-thumb, .dsh-bg-card:not([data-thumb])[data-selected] .dsh-bg-thumb { background-color: #00fff0; }',
       '.dsh-bg-card[data-thumb]:hover .dsh-bg-thumb, .dsh-bg-card[data-thumb][data-selected] .dsh-bg-thumb { filter: brightness(1.22); }',
       '.dsh-bg-card:hover:not([data-disabled]) .dsh-bg-card-text, .dsh-bg-card[data-selected] .dsh-bg-card-text { background: #00fff0; color: #000 !important; text-shadow: none; }',
-      '.dsh-bg-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(0, 255, 240, 0.12); }',
+      '.dsh-bg-row { display: grid; grid-template-columns: max-content minmax(120px, 1fr); align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid rgba(0, 255, 240, 0.12); }',
       '.dsh-bg-row:last-child { border-bottom: none; }',
-      '.dsh-bg-label { font-size: 12px; letter-spacing: 0.06em; color: rgba(0, 255, 240, 0.86); }',
+      '.dsh-bg-label { font-size: 12px; letter-spacing: 0.06em; color: rgba(0, 255, 240, 0.86); white-space: nowrap; }',
       '.dsh-bg-control { display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 0; }',
       '.dsh-bg-value { width: 56px; text-align: right; font-size: 12px; color: rgba(0, 255, 240, 0.75); }',
       '.dsh-bg-reset { display: inline-flex; flex: 0 0 auto; align-items: center; justify-content: center; width: 20px; height: 18px; padding: 0; background: transparent; border: 1px solid rgba(0, 255, 240, 0.35); color: rgba(0, 255, 240, 0.80) !important; cursor: pointer; transition: background-color .12s ease, border-color .12s ease, opacity .12s ease; }',
@@ -1636,6 +1670,14 @@ const VV_OPTIONS = [
       /* 2.4.1：两级树 + 右侧设置项 + 经典保存 / 取消 / 应用 */
       '.dsh-bg-body { gap: 0; padding-top: 10px; }',
       '.dsh-bg-tree { flex: none; width: 190px; margin-right: 0; padding: 6px 0; overflow: auto; background: rgba(0, 0, 0, 0.45); border-right: 1px solid rgba(0, 255, 240, 0.22); }',
+      /* 2.5.0：视觉增强包的模式滑块放在树下方（默认包设置 / 各增强包） */
+      '.dsh-bg-tree-wrap { flex: none; width: 190px; display: flex; flex-direction: column; min-height: 0; background: rgba(0, 0, 0, 0.45); border-right: 1px solid rgba(0, 255, 240, 0.22); }',
+      '.dsh-bg-tree { flex: 1 1 auto; min-height: 0; width: auto; margin-right: 0; padding: 6px 0; overflow: auto; background: transparent; border-right: 0; }',
+      '.dsh-bg-pack-switch { flex: none; display: flex; overflow-x: auto; border-top: 1px solid rgba(0, 255, 240, 0.22); }',
+      '.dsh-bg-pack-opt { flex: 0 0 auto; max-width: 55%; padding: 7px 10px; text-align: center; font-size: 11px; letter-spacing: 0.04em; color: rgba(0, 255, 240, 0.66); cursor: pointer; user-select: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 2px solid transparent; }',
+      '.dsh-bg-pack-opt:first-child { border-left: 0; }',
+      '.dsh-bg-pack-opt:hover { background: rgba(0, 255, 240, 0.06); color: #00fff0; }',
+      '.dsh-bg-pack-opt[data-active] { background: rgba(0, 255, 240, 0.14); color: #00fff0; border-left-color: #00fff0; }',
       '.dsh-bg-tree-group { padding-bottom: 2px; }',
       '.dsh-bg-tree-root { display: flex; align-items: center; gap: 7px; padding: 7px 10px; color: rgba(0, 255, 240, 0.62); font-size: 12px; letter-spacing: 0.14em; cursor: pointer; user-select: none; }',
       '.dsh-bg-tree-root:hover { background: rgba(0, 255, 240, 0.06); color: #00fff0; }',
@@ -2565,6 +2607,8 @@ const VV_OPTIONS = [
         function: 'workflow', resolution: '2k', vv: 'static', character: 'vector',
         breathing: 'on', scene: 'neutral', motion: 'calm',
       },
+      /* 出厂预设也把功能开关归位 */
+      prefs: { boot: true, toolsAutoRetract: true },
       /* 出厂布局：组件位置 / 缩放 / 模式 / 显隐一起归位（2.5 起 Default 也带布局） */
       layout: {
         positions: {
@@ -2604,6 +2648,9 @@ const VV_OPTIONS = [
           tags: item.tags && typeof item.tags === 'object' ? item.tags : {},
           config: item.config,
           layout: item.layout && typeof item.layout === 'object' ? item.layout : null,
+          /* 2.5.0：功能性开关（开场动画 / 按钮自动缩回）与增强包配置也进预设 */
+          prefs: item.prefs && typeof item.prefs === 'object' ? item.prefs : null,
+          visual: item.visual && typeof item.visual === 'object' ? item.visual : null,
           builtin: item.builtin === true,
           template: item.template === true,
         }));
@@ -3125,6 +3172,8 @@ const VV_OPTIONS = [
           tags: Object.assign({}, draftTags),
           config: themeClone(config),
           layout: readLayoutSnapshot(),
+          prefs: captureFunctionalPrefs(),
+          visual: captureVisualPrefs(),
         });
         writePresets(next);
         if (onChangePresets) onChangePresets(next);
@@ -3257,6 +3306,60 @@ const VV_OPTIONS = [
        打开面板时回到上次看的设置页 / 展开的分组，不用每次从根节点重新点。 */
     const BG_VIEW_KEY = 'dsh-exv-bg-view.v1';
 
+    /* 视觉增强包注册口：包在加载时把自己 push 进 window.__DSH_EXV_VISUAL_PACKS__，
+       基座每次打开背景编辑都重新读一遍（面板组件是挂载/卸载的）。声明式 schema：
+       { id, title, sections: [{ id, title, rows: [{ type:'switch'|'slider'|'segmented', key, label, ... }] }],
+         get() -> values, set(patch) }。基座只负责画通用控件，包自己存配置。 */
+    const readVisualPacks = () => {
+      try {
+        const list = window.__DSH_EXV_VISUAL_PACKS__;
+        if (!Array.isArray(list)) return [];
+        const seen = new Set();
+        const out = [];
+        for (const pack of list) {
+          if (!pack || typeof pack.id !== 'string' || seen.has(pack.id)) continue;
+          if (!Array.isArray(pack.sections)) continue;
+          seen.add(pack.id);
+          out.push(pack);
+        }
+        return out;
+      } catch (error) {
+        return [];
+      }
+    };
+
+    /* 预设快照：把 localStorage 里的功能性开关和增强包配置也一起存/一起应用 */
+    const captureFunctionalPrefs = () => ({
+      boot: isBootEnabled(),
+      toolsAutoRetract: isToolsAutoRetract(),
+    });
+    const captureVisualPrefs = () => {
+      const out = {};
+      readVisualPacks().forEach((pack) => {
+        try { out[pack.id] = pack.get ? pack.get() : {}; } catch (error) { out[pack.id] = {}; }
+      });
+      return out;
+    };
+    const applyFunctionalPrefs = (prefs) => {
+      if (!prefs || typeof prefs !== 'object') return;
+      if (typeof prefs.boot === 'boolean') setBootEnabled(prefs.boot);
+      if (typeof prefs.toolsAutoRetract === 'boolean') setToolsAutoRetract(prefs.toolsAutoRetract);
+    };
+    const applyVisualPrefs = (visual) => {
+      if (!visual || typeof visual !== 'object') return;
+      readVisualPacks().forEach((pack) => {
+        if (!visual[pack.id] || typeof pack.set !== 'function') return;
+        try { pack.set(visual[pack.id]); } catch (error) { /* ignore */ }
+      });
+    };
+    /* 出厂预设：让每个视觉包把自己恢复到默认配置（包可选提供 defaults()） */
+    const applyVisualDefaults = () => {
+      readVisualPacks().forEach((pack) => {
+        if (typeof pack.set !== 'function' || typeof pack.defaults !== 'function') return;
+        try { pack.set(pack.defaults()); } catch (error) { /* ignore */ }
+      });
+    };
+
     function BackgroundEditor({ store, onClose }) {
       const [saved, setSaved] = React.useState(() => themeClone(store.get()));
       const [draft, setDraft] = React.useState(() => themeClone(store.get()));
@@ -3271,9 +3374,29 @@ const VV_OPTIONS = [
       const savedRef = React.useRef(saved);
       const draftRef = React.useRef(draft);
       const pendingLayoutRef = React.useRef(null);
+      const pendingPrefsRef = React.useRef(null);
+      const pendingVisualRef = React.useRef(null);
+      const pendingFactoryRef = React.useRef(false);
       const [pendingLayout, setPendingLayout] = React.useState(false);
       /* 开场动画开关单独存盘（localStorage.dsh-exv-boot），不走草稿 / 应用那套 */
       const [bootOn, setBootOn] = React.useState(isBootEnabled);
+      const [toolsAutoRetractOn, setToolsAutoRetractOn] = React.useState(isToolsAutoRetract);
+      React.useEffect(() => subscribeToolsAutoRetract(setToolsAutoRetractOn), []);
+      /* 视觉增强包：每次打开面板重新检测（组件随面板挂载/卸载） */
+      const packs = React.useMemo(readVisualPacks, []);
+      const [packId, setPackId] = React.useState('base');
+      const [packNode, setPackNode] = React.useState(null);
+      const [packValues, setPackValues] = React.useState(() => {
+        const values = {};
+        packs.forEach((pack) => {
+          try { values[pack.id] = pack.get ? pack.get() : {}; } catch (error) { values[pack.id] = {}; }
+        });
+        return values;
+      });
+      const activePack = packs.find((pack) => pack.id === packId) || null;
+      const activeSection = activePack
+        ? (activePack.sections.find((section) => section.id === packNode) || activePack.sections[0] || null)
+        : null;
       savedRef.current = saved;
       draftRef.current = draft;
 
@@ -3371,12 +3494,18 @@ const VV_OPTIONS = [
       const loadPreset = (preset) => {
         setDraft(preset.factory ? themeClone(THEME_DEFAULTS) : themeClone(preset.config));
         pendingLayoutRef.current = preset.layout || null;
-        setPendingLayout(Boolean(preset.layout));
+        pendingPrefsRef.current = preset.prefs && typeof preset.prefs === 'object' ? preset.prefs : null;
+        pendingVisualRef.current = preset.visual && typeof preset.visual === 'object' ? preset.visual : null;
+        pendingFactoryRef.current = preset.factory === true;
+        setPendingLayout(Boolean(preset.layout || preset.prefs || preset.visual));
         setDirty(true);
       };
 
       const apply = () => {
         const layout = pendingLayoutRef.current;
+        const prefs = pendingPrefsRef.current;
+        const visual = pendingVisualRef.current;
+        const factory = pendingFactoryRef.current;
         store.patch(themeClone(draftRef.current));
         const current = themeClone(store.get());
         savedRef.current = current;
@@ -3385,6 +3514,21 @@ const VV_OPTIONS = [
         setDirty(false);
         pendingLayoutRef.current = null;
         setPendingLayout(false);
+        pendingPrefsRef.current = null;
+        pendingVisualRef.current = null;
+        pendingFactoryRef.current = false;
+        if (prefs) applyFunctionalPrefs(prefs);
+        if (factory) applyVisualDefaults();
+        else if (visual) applyVisualPrefs(visual);
+        if (prefs || visual || factory) {
+          setPackValues(() => {
+            const values = {};
+            packs.forEach((pack) => {
+              try { values[pack.id] = pack.get ? pack.get() : {}; } catch (error) { values[pack.id] = {}; }
+            });
+            return values;
+          });
+        }
         if (layout) applyLayoutSnapshot(layout);
       };
 
@@ -3392,6 +3536,9 @@ const VV_OPTIONS = [
         setDraft(themeClone(savedRef.current));
         setDirty(false);
         pendingLayoutRef.current = null;
+        pendingPrefsRef.current = null;
+        pendingVisualRef.current = null;
+        pendingFactoryRef.current = false;
         setPendingLayout(false);
         onClose();
       };
@@ -3520,12 +3667,12 @@ const VV_OPTIONS = [
       const TREE = [
         { id: 'style', label: '样式', children: [
           { id: 'style/background', label: '背景' },
+          { id: 'style/grid', label: '背景网格' },
           { id: 'style/vv', label: '主人物' },
           { id: 'style/logo', label: 'LOGO' },
           { id: 'style/rain', label: '代码雨' },
         ] },
         { id: 'sfx', label: 'SFX', children: [
-          { id: 'sfx/grid', label: '网格亮度' },
           { id: 'sfx/vv', label: '人物照明' },
           { id: 'sfx/cursor', label: '光标照明' },
           { id: 'sfx/press', label: '拖拽照明' },
@@ -3545,10 +3692,12 @@ const VV_OPTIONS = [
         { id: 'presets', label: '预设' },
         { id: 'other', label: '其他', children: [
           { id: 'other/boot', label: '开场动画' },
+          { id: 'other/tools', label: '工具按钮' },
         ] },
       ];
 
       const nodeLabel = (() => {
+        if (activePack) return (activePack.title || '增强包设置') + (activeSection && activeSection.title ? ' / ' + activeSection.title : '');
         if (!node) return '设置';
         for (const group of TREE) {
           if (group.id === node) return group.label;
@@ -3584,6 +3733,48 @@ const VV_OPTIONS = [
       };
 
       const content = (() => {
+        if (activePack) {
+          const values = packValues[activePack.id] || {};
+          const setPackValue = (key, next) => {
+            try { if (activePack.set) activePack.set({ [key]: next }); } catch (error) { /* ignore */ }
+            setPackValues((previous) => ({
+              ...previous,
+              [activePack.id]: { ...(previous[activePack.id] || {}), [key]: next },
+            }));
+          };
+          const packRow = (item) => {
+            const value = values[item.key];
+            if (item.type === 'hint') {
+              return h('div', { className: 'dsh-bg-hint' }, item.text);
+            }
+            if (item.type === 'switch') {
+              return row(item.label, h(Switch, { on: value !== false, onChange: (next) => setPackValue(item.key, next) }));
+            }
+            if (item.type === 'slider') {
+              return sliderRow(item.label, value, item.min, item.max, (next) => setPackValue(item.key, next), (v) => `${v}${item.unit || ''}`, item.defaultValue);
+            }
+            if (item.type === 'segmented') {
+              return row(item.label, h(Segmented, {
+                options: item.options || [],
+                value: String(value),
+                onChange: (id) => setPackValue(item.key, id),
+              }));
+            }
+            return null;
+          };
+          const section = activeSection;
+          return h('div', { className: 'dsh-bg-section' },
+            h('div', { className: 'dsh-bg-hint' }, '增强包设置即时生效，不进草稿，也不用点应用。'),
+            section ? h('div', {
+              key: section.id || section.title,
+              className: 'dsh-bg-pack-section',
+            },
+              section.title ? groupTitle(section.title) : null,
+              (section.rows || []).map((item) => {
+                const node = packRow(item);
+                return node ? React.cloneElement(node, { key: item.key || item.type }) : null;
+              })) : null);
+        }
         if (!node) {
           return h('div', { className: 'dsh-bg-empty' },
             h('svg', { viewBox: '0 0 64 64', width: '48', height: '48', fill: 'none', stroke: 'rgba(0, 255, 240, 0.35)', strokeWidth: '1.5', 'aria-hidden': 'true' },
@@ -3651,7 +3842,6 @@ const VV_OPTIONS = [
         if (node === 'style/rain') {
           return h('div', { className: 'dsh-bg-section' },
             row('显示代码雨', h(Switch, { on: draft.rain.enabled, onChange: (next) => patch({ rain: { enabled: next } }) })),
-            row('全局网格', h(Switch, { on: draft.rain.grid, onChange: (next) => patch({ rain: { grid: next } }) })),
             row('代码雨模式', h(Segmented, {
               options: RAIN_CHAR_OPTIONS,
               value: draft.rain.charMode,
@@ -3659,8 +3849,9 @@ const VV_OPTIONS = [
             })));
         }
 
-        if (node === 'sfx/grid') {
+        if (node === 'style/grid') {
           return h('div', { className: 'dsh-bg-section' },
+            row('显示背景网格', h(Switch, { on: draft.rain.grid, onChange: (next) => patch({ rain: { grid: next } }) })),
             sliderRow('网格亮度', draft.rain.gridBrightness, 0, 200, (next) => patch({ rain: { gridBrightness: next } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBrightness),
             row('亮度呼吸', h(Switch, { on: draft.rain.gridBreathing.enabled, onChange: (next) => patch({ rain: { gridBreathing: { enabled: next } } }) })),
             sliderRow('亮度强度', draft.rain.gridBreathing.strength, 0, 100, (next) => patch({ rain: { gridBreathing: { strength: next } } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBreathing.strength));
@@ -3785,6 +3976,15 @@ const VV_OPTIONS = [
             })));
         }
 
+        if (node === 'other/tools') {
+          return h('div', { className: 'dsh-bg-section' },
+            row('按钮自动缩回', h(Switch, {
+              on: toolsAutoRetractOn,
+              onChange: (next) => setToolsAutoRetract(next),
+            })),
+            h('div', { className: 'dsh-bg-hint' }, '打开模式后按钮自动收成图标；关掉后保持展开，要不要挡住下面的东西由你自己决定。'));
+        }
+
         return null;
       })();
 
@@ -3831,8 +4031,17 @@ const VV_OPTIONS = [
             ),
           ),
           h('div', { className: 'dsh-bg-body' },
-            h('div', { className: 'dsh-bg-tree' },
-              TREE.map((group) => {
+            h('div', { className: 'dsh-bg-tree-wrap' },
+              h('div', { className: 'dsh-bg-tree' },
+                activePack
+                  ? (activePack.sections || []).map((section) => h('div', {
+                    key: section.id || section.title,
+                    className: 'dsh-bg-tree-item',
+                    'data-active': activeSection && activeSection.id === section.id ? '' : undefined,
+                    role: 'button',
+                    onClick: () => setPackNode(section.id),
+                  }, section.title || section.id))
+                  : TREE.map((group) => {
                 const hasChildren = Array.isArray(group.children) && group.children.length > 0;
                 const expanded = hasChildren && Boolean(openGroups[group.id]);
                 const groupActive = node === group.id
@@ -3878,24 +4087,50 @@ const VV_OPTIONS = [
                     }, child.label))) : null,
                 );
               })),
+              packs.length ? h('div', { className: 'dsh-bg-pack-switch' },
+                h('div', {
+                  className: 'dsh-bg-pack-opt',
+                  'data-active': packId === 'base' ? '' : undefined,
+                  role: 'button',
+                  onClick: () => { setPackId('base'); setPackNode(null); },
+                }, '默认包设置'),
+                packs.map((pack) => h('div', {
+                  key: pack.id,
+                  className: 'dsh-bg-pack-opt',
+                  'data-active': packId === pack.id ? '' : undefined,
+                  role: 'button',
+                  title: pack.title || pack.id,
+                  onClick: () => {
+                    setPackId(pack.id);
+                    setPackNode((pack.sections[0] || {}).id || null);
+                  },
+                }, pack.title || pack.id))) : null,
+            ),
             h('div', { className: 'dsh-bg-main' },
               h('div', { className: 'dsh-bg-main-head' }, nodeLabel),
               h('div', { className: 'dsh-bg-content' }, content)),
           ),
           h('div', { className: 'dsh-bg-foot' },
-            h('span', null, pendingLayout ? '预设已载入，点应用生效' : dirty ? '有未应用的修改' : '设置已同步'),
+            h('span', null, activePack
+              ? '增强包设置即时生效'
+              : pendingLayout ? '预设已载入，点应用生效' : dirty ? '有未应用的修改' : '设置已同步'),
             h('div', { className: 'dsh-bg-foot-actions' },
-              node === 'presets' && activePreset && !activePreset.factory
-                ? h('button', {
-                  type: 'button',
-                  className: 'dsh-bg-btn dsh-bg-btn-danger',
-                  title: '删除预设「' + activePreset.name + '」',
-                  onClick: () => requestDeletePreset(activePreset),
-                }, '删除预设')
-                : null,
-              h('button', { type: 'button', className: 'dsh-bg-btn', 'data-primary': '', onClick: save }, '保存'),
-              h('button', { type: 'button', className: 'dsh-bg-btn', onClick: cancel }, '取消'),
-              h('button', { type: 'button', className: 'dsh-bg-btn', disabled: !dirty, onClick: apply }, '应用'))),
+              activePack
+                ? h('button', { type: 'button', className: 'dsh-bg-btn', onClick: cancel }, '关闭')
+                : [
+                  node === 'presets' && activePreset && !activePreset.factory
+                    ? h('button', {
+                      key: 'delete-preset',
+                      type: 'button',
+                      className: 'dsh-bg-btn dsh-bg-btn-danger',
+                      title: '删除预设「' + activePreset.name + '」',
+                      onClick: () => requestDeletePreset(activePreset),
+                    }, '删除预设')
+                    : null,
+                  h('button', { key: 'save', type: 'button', className: 'dsh-bg-btn', 'data-primary': '', onClick: save }, '保存'),
+                  h('button', { key: 'cancel', type: 'button', className: 'dsh-bg-btn', onClick: cancel }, '取消'),
+                  h('button', { key: 'apply', type: 'button', className: 'dsh-bg-btn', disabled: !dirty, onClick: apply }, '应用'),
+                ])),
           confirmPreset ? h('div', { className: 'dsh-bg-confirm' },
             h('div', { className: 'dsh-bg-confirm-box' },
               h('div', { className: 'dsh-bg-confirm-title' }, '删除预设「' + confirmPreset.name + '」'),
@@ -5080,6 +5315,9 @@ const VV_OPTIONS = [
       const [editing, setEditing] = React.useState(false);
       const [panelOpen, setPanelOpen] = React.useState(false);
       const [desktopOpen, setDesktopOpen] = React.useState(false);
+      const [toolsAutoRetract, setToolsAutoRetract] = React.useState(isToolsAutoRetract);
+      const [hintMuted, setHintMuted] = React.useState(false);
+      React.useEffect(() => subscribeToolsAutoRetract(setToolsAutoRetract), []);
       const [vvMode, setVvMode] = React.useState(() => {
         const store = window.__DSH_EXV__;
         const current = store && store.get ? store.get() : null;
@@ -6332,6 +6570,18 @@ const VV_OPTIONS = [
         if (!window.__dshScanWave) return;
         window.__dshScanWave(window.innerWidth, window.innerHeight);
       };
+      /* 点过的按钮先别弹提示：等到下一次重新悬停再显示 */
+      const muteToolHint = (event) => {
+        const el = event && event.currentTarget;
+        if (!el) return;
+        el.dataset.hoverMuted = '1';
+        setHintMuted(true);
+        el.addEventListener('pointerleave', function clearMute() {
+          delete el.dataset.hoverMuted;
+          el.removeEventListener('pointerleave', clearMute);
+          setHintMuted(false);
+        });
+      };
       const floating = h('div', {
         className: 'dsh-float',
         'data-dsh-float': '',
@@ -6352,6 +6602,9 @@ const VV_OPTIONS = [
         }),
         toolsPlacement === null ? null : h('div', {
           className: 'dsh-tools',
+          'data-autoretract': toolsAutoRetract ? '1' : '0',
+          'data-desktop': desktopOpen ? '1' : '0',
+          'data-hint-muted': hintMuted ? '1' : '0',
           style: {
             right: `${toolsPlacement.right}px`,
             top: `${toolsPlacement.top}px`,
@@ -6414,6 +6667,7 @@ const VV_OPTIONS = [
             type: 'button',
             className: 'dsh-tool',
             'data-active': editing ? '' : undefined,
+            onPointerDown: muteToolHint,
             onClick: () => {
               if (!editing) toolScan();
               setEditing((value) => !value);
@@ -6428,6 +6682,7 @@ const VV_OPTIONS = [
             type: 'button',
             className: 'dsh-tool',
             'data-active': panelOpen ? '' : undefined,
+            onPointerDown: muteToolHint,
             onClick: () => {
               if (!panelOpen) toolScan();
               setPanelOpen((value) => !value);
@@ -6439,11 +6694,11 @@ const VV_OPTIONS = [
             h('span', { className: 'dsh-tool-label' }, '背景编辑'),
           ),
           h('div', { className: 'dsh-tool-row' },
-            vvMode === 'live2d' ? h('span', { className: 'dsh-tool-hint' }, 'Alt + 左键拖动头部') : null,
             h('button', {
               type: 'button',
               className: 'dsh-tool',
               'data-active': desktopOpen ? '' : undefined,
+              onPointerDown: muteToolHint,
               onClick: () => {
                 const next = !desktopOpen;
                 if (next) toolScan();
@@ -6458,6 +6713,7 @@ const VV_OPTIONS = [
               h('span', { className: 'dsh-tool-label' }, '桌面模式'),
             ),
           ),
+          vvMode === 'live2d' ? h('span', { className: 'dsh-tool-hint' }, 'Alt + 左键拖动头部') : null,
         ),
       );
       /* All HUD widgets stay in one portal so panels can cover them; React
