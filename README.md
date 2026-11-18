@@ -3,9 +3,7 @@
 给 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 的科幻 HUD 主题包：纯黑底、青色 HUD、分层视差背景、代码雨与扫描波、15 个 Live2D 主人物，以及一套能自己摆放的 HUD 组件。整包自包含，不联网，不依赖外部资源服务。
 
 A self-contained sci-fi HUD theme for DeepSeek Harness: black and cyan, parallax backdrop, code rain, 15 Live2D characters and a HUD you can arrange yourself. No network calls, no external asset server.
-
-<img width="720" height="405" alt="EXV 开场动画" src="https://github.com/user-attachments/assets/185fe334-082f-4f73-bd4c-030e34a058e4" />
-
+<img width="720" height="405" alt="EXV-boot-visual-0 1 1-release-720" src="https://github.com/user-attachments/assets/5e9ee558-d405-4b7d-8ca1-d1226a092992" />
 ## 安装 / Install
 
 侧边栏 **Plugins → Add plugin**，填入 `dsh-exv-theme`，装完重启 DSH。
