@@ -30,9 +30,38 @@ window.__ModuleLoader__.load({
     const THEME_CONFIG_KEY = 'dsh-exv-theme.config.v1';
     const THEME_VERSION = 3;
     const LIVE2D_DEFAULTS = {"ar15_4508":{"scale":180,"x":-9,"y":52},"ar15mod_n":{"scale":150,"x":1,"y":59},"hk416_3401_n":{"scale":143,"x":3,"y":45},"hk416_3401_d":{"scale":148,"x":0,"y":33},"hk416_805":{"scale":135,"x":1,"y":37},"hk416mod_n":{"scale":155,"x":2,"y":8},"m4_sopmod_ii_4507_n":{"scale":165,"x":1,"y":53},"m4_sopmod_ii_4507_d":{"scale":114,"x":4,"y":0},"m4_sopmod_iimod":{"scale":135,"x":-1,"y":39},"m4a1mod":{"scale":142,"x":2,"y":49},"ro635_4504":{"scale":139,"x":3,"y":37},"ro635mod":{"scale":146,"x":3,"y":49},"ump45mod_n":{"scale":139,"x":0,"y":40},"vector_1901":{"scale":153,"x":16,"y":60},"vector_6701_n":{"scale":170,"x":5,"y":26}};
+    /* 主色（2.5.2）：与 cyan 共用配置字段 theme.accent；画布是逐帧画的，
+       所以这里缓存当前主色，颜色字符串按需拼，不在每帧做解析。 */
+    const ACCENT_DEFAULT = '#00FFF0';
+    const FULLBODY_LIVE2D_DEFAULTS = {ar15_4508:[103,0,1],ar15mod_n:[106,0,3],hk416_3401_n:[112,0,6],hk416_3401_d:[139,0,17],hk416_805:[110,0,5],hk416mod_n:[159,0,-2],m4_sopmod_ii_4507_n:[103,0,1],m4_sopmod_ii_4507_d:[131,0,32],m4_sopmod_iimod:[106,0,3],m4a1mod:[106,0,0],ro635_4504:[116,0,8],ro635mod:[104,0,4],ump45mod_n:[109,0,1],vector_1901:[103,0,3],vector_6701_n:[126,0,-2]};
+    const accentHexOf = (cfg) => {
+      const value = cfg && cfg.theme && cfg.theme.accent;
+      return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : ACCENT_DEFAULT;
+    };
+    const SOLID_BG_DEFAULT = '#151517';
+    const solidColorOf = (value) => (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? value.toUpperCase() : SOLID_BG_DEFAULT);
+    let accentHexNow = ACCENT_DEFAULT;
+    let accentCacheHex = '';
+    let accentCacheRgb = [0, 255, 240];
+    const accentRgbNow = () => {
+      if (accentCacheHex !== accentHexNow) {
+        accentCacheHex = accentHexNow;
+        accentCacheRgb = [
+          parseInt(accentCacheHex.slice(1, 3), 16),
+          parseInt(accentCacheHex.slice(3, 5), 16),
+          parseInt(accentCacheHex.slice(5, 7), 16),
+        ];
+      }
+      return accentCacheRgb;
+    };
+    const accentRgba = (alpha) => {
+      const [r, g, b] = accentRgbNow();
+      return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+    };
 const THEME_DEFAULTS = {
       version: THEME_VERSION,
-      background: { preset: 'default', breathing: { enabled: true, amplitude: 12 } },
+      theme: { accent: ACCENT_DEFAULT },
+      background: { preset: 'default', solidColor: SOLID_BG_DEFAULT, breathing: { enabled: true, amplitude: 12 } },
       rain: {
         enabled: true,
         grid: true,
@@ -56,7 +85,7 @@ const THEME_DEFAULTS = {
       },
     };
     const THEME_ENUMS = {
-      'background.preset': ['default', 'chips', 'cyberpunk', 'starsky', 'frankfurt', 'darkness'],
+      'background.preset': ['default', 'chips', 'cyberpunk', 'starsky', 'frankfurt', 'darkness', 'solid'],
       'logos.preset': ['default', 'mark', 'text'],
       'vv.mode': ['none', 'static', 'live2d'],
       'vv.preset': ['vv', 'scarh', 'hk416', 'scarl', 'ump45', 'vector', 'ak12', 'm200', 'ak74m'],
@@ -106,6 +135,9 @@ const THEME_DEFAULTS = {
       const background = themeGroup(raw, 'background');
       out.background.preset = themeOneOf('background.preset', background.preset, out.background.preset);
       out.background.breathing = breathing(background.breathing);
+      out.background.solidColor = solidColorOf(background.solidColor);
+      const themeCfg = themeGroup(raw, 'theme');
+      out.theme.accent = accentHexOf({ theme: themeCfg });
       const rain = themeGroup(raw, 'rain');
       out.rain.enabled = rain.enabled !== false;
       out.rain.grid = rain.grid !== false;
@@ -146,13 +178,21 @@ const THEME_DEFAULTS = {
       out.vv.live2dConfig = {};
       for (const id of ["ar15_4508","ar15mod_n","hk416_3401_n","hk416_3401_d","hk416_805","hk416mod_n","m4_sopmod_ii_4507_n","m4_sopmod_ii_4507_d","m4_sopmod_iimod","m4a1mod","ro635_4504","ro635mod","ump45mod_n","vector_1901","vector_6701_n"]) {
         const def = LIVE2D_DEFAULTS[id] || { scale: 100, x: 0, y: 0 };
+        const fullBodyDefault = FULLBODY_LIVE2D_DEFAULTS[id];
         const item = live2dConfig[id] && typeof live2dConfig[id] === 'object' ? live2dConfig[id] : {};
-        out.vv.live2dConfig[id] = {
+        const normalized = {
           scale: Math.round(themeNumber(item.scale, Math.max(0, def.scale - 100), def.scale + 100, def.scale)),
           x: Math.round(themeNumber(item.x, def.x - 50, def.x + 50, def.x)),
           y: Math.round(themeNumber(item.y, def.y - 80, def.y + 80, def.y)),
           eye: item.eye !== false,
         };
+        /* 2.5.2：之前被改成「全身默认」的条目回退成 2.5.1 的默认（幂等；自己调过的保留） */
+        if (fullBodyDefault && normalized.scale === fullBodyDefault[0] && normalized.x === fullBodyDefault[1] && normalized.y === fullBodyDefault[2]) {
+          normalized.scale = def.scale;
+          normalized.x = def.x;
+          normalized.y = def.y;
+        }
+        out.vv.live2dConfig[id] = normalized;
       }
       const vvStatic = vv.staticConfig && typeof vv.staticConfig === 'object' ? vv.staticConfig : {};
       out.vv.staticConfig = {
@@ -278,6 +318,11 @@ const THEME_DEFAULTS = {
         image: 'none',
         size: 'cover',
       },
+      /* 2.6.0：自定义纯色，颜色来自 background.solidColor（backgroundColor 在 applyConfig 里写） */
+      solid: {
+        image: 'none',
+        size: 'cover',
+      },
     };
 
     const VV_PRESETS = {
@@ -311,12 +356,12 @@ const THEME_DEFAULTS = {
       '#dsh-parallax .pl-grid-layer, #dsh-parallax .pl-rain-layer { position: absolute; inset: 0; }',
       '#dsh-parallax .pl-grid-layer canvas, #dsh-parallax .pl-rain-layer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }',
       '#dsh-parallax .pl-logos { position: absolute; top: 64px; right: 36px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; transform-origin: top right; }',
-      '#dsh-parallax .pl-logo { display: block; width: 150px; height: auto; opacity: 1; filter: drop-shadow(0 0 10px rgba(0, 255, 240, 0.35)); }',
+      '#dsh-parallax .pl-logo { display: block; width: 150px; height: auto; opacity: 1; filter: drop-shadow(0 0 10px rgba(var(--dsh-accent-rgb, 0,255,240), 0.35)); }',
       '#dsh-parallax .pl-wordmark { display: block; width: 150px; height: auto; opacity: 1; }',
       '#dsh-parallax .pl-vv-wrap { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }',
-      '#dsh-parallax .pl-vv { height: calc(94vh * var(--vv-scale, 1)); width: auto; max-width: none; object-fit: contain; opacity: 1; transform-origin: bottom center; transform: translate(calc(var(--vv-x, 0) * 1vw), calc(6vh + var(--vv-y, 0) * 1vh)); filter: drop-shadow(0 0 34px rgba(0, 255, 240, 0.16)); }',
+      '#dsh-parallax .pl-vv { height: calc(94vh * var(--vv-scale, 1)); width: auto; max-width: none; object-fit: contain; opacity: 1; transform-origin: bottom center; transform: translate(calc(var(--vv-x, 0) * 1vw), calc(6vh + var(--vv-y, 0) * 1vh)); filter: drop-shadow(0 0 34px rgba(var(--dsh-accent-rgb, 0,255,240), 0.16)); }',
       '#dsh-parallax .pl-live2d { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }',
-      '#dsh-parallax .pl-press-glow { position: fixed; z-index: 60; left: -999px; top: -999px; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(0, 255, 240, 0.42) 0%, rgba(0, 255, 240, 0.16) 34%, rgba(0, 255, 240, 0.05) 58%, transparent 72%); filter: blur(6px); mix-blend-mode: screen; transition: opacity .12s ease; }',
+      '#dsh-parallax .pl-press-glow { position: fixed; z-index: 60; left: -999px; top: -999px; width: 280px; height: 280px; margin: -140px 0 0 -140px; border-radius: 50%; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(var(--dsh-accent-rgb, 0,255,240), 0.42) 0%, rgba(var(--dsh-accent-rgb, 0,255,240), 0.16) 34%, rgba(var(--dsh-accent-rgb, 0,255,240), 0.05) 58%, transparent 72%); filter: blur(6px); mix-blend-mode: screen; transition: opacity .12s ease; }',
     ].join('\n');
 
     /**
@@ -337,11 +382,18 @@ const THEME_DEFAULTS = {
       const STEP = CELL + GAP;
       /* 颜色字符串按 8-bit 透明度预生成：每帧上千次 paint() 不再制造垃圾 */
       const PAINT_STEPS = 256;
-      const paintTable = [];
-      for (let index = 0; index <= PAINT_STEPS; index += 1) {
-        paintTable.push(`rgba(0, 255, 240, ${(index / PAINT_STEPS).toFixed(3)})`);
-      }
-      const paint = (alpha) => paintTable[Math.max(0, Math.min(PAINT_STEPS, Math.round(alpha * PAINT_STEPS)))];
+      let paintTable = [];
+      let paintHex = '';
+      const buildPaint = () => {
+        if (paintHex === accentHexNow) return paintTable;
+        paintHex = accentHexNow;
+        paintTable = [];
+        for (let index = 0; index <= PAINT_STEPS; index += 1) {
+          paintTable.push(accentRgba((index / PAINT_STEPS).toFixed(3)));
+        }
+        return paintTable;
+      };
+      const paint = (alpha) => buildPaint()[Math.max(0, Math.min(PAINT_STEPS, Math.round(alpha * PAINT_STEPS)))];
       const headPaint = () => 'rgba(255, 255, 255, 1)';
       /* 不读取 prefers-reduced-motion：本主题的动效就是它的全部内容，
          而且 Windows 关闭“显示动画”或远程会话下这个偏好会变成 reduce，
@@ -463,9 +515,9 @@ const THEME_DEFAULTS = {
         const gradient = glowContext.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
         gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
         gradient.addColorStop(0.10, 'rgba(226, 255, 252, 0.85)');
-        gradient.addColorStop(0.34, 'rgba(0, 255, 240, 0.26)');
-        gradient.addColorStop(0.66, 'rgba(0, 255, 240, 0.07)');
-        gradient.addColorStop(1, 'rgba(0, 255, 240, 0)');
+        gradient.addColorStop(0.34, accentRgba(0.26));
+        gradient.addColorStop(0.66, accentRgba(0.07));
+        gradient.addColorStop(1, accentRgba(0));
         glowContext.fillStyle = gradient;
         glowContext.fillRect(0, 0, size, size);
         headGlowCanvas = surface;
@@ -1136,8 +1188,10 @@ const THEME_DEFAULTS = {
           if (window.__dshExvDebug) window.__dshExvDebug.rainFrames += 1;
           const rainCfg = config().rain || {};
           const showRain = rainOn();
-          /* 只开网格时提到 60fps：光标照明/涟漪是 fps 敏感的，30fps 会明显发抖 */
-          const fps = showRain ? Math.max(1, Math.min(60, Number(rainCfg.fps) || 60)) : 60;
+          /* 背景层统一帧率（UI 里的「背景网格帧率」）：网格的点亮 / 涟漪 / 扫描波 / 各种照明
+             和代码雨同处一个循环，共用这一档。以前代码雨关掉时会被强制拉到 60fps，
+             导致那一档在关雨状态下完全不起作用，现在按设置走。 */
+          const fps = Math.max(1, Math.min(60, Number(rainCfg.fps) || 60));
           if (!lastFrame || now - lastFrame >= 1000 / fps - 0.5) {
             lastFrame = now;
             const speedScale = Math.max(0.25, Math.min(2, (Number(rainCfg.speed) || 100) / 100));
@@ -1382,6 +1436,8 @@ const THEME_DEFAULTS = {
 
       const store = window.__DSH_EXV__;
       let config = store ? store.get() : null;
+      /* 主色只在启动时读一次：换色要重启 DSH 才生效（与 cyan 一致） */
+      accentHexNow = accentHexOf(config);
 
       const rainControl = startRain(canvas, gridCanvas, () => config, () => (config && config.vv.mode !== 'none' ? vv : null));
 
@@ -2023,6 +2079,7 @@ const THEME_DEFAULTS = {
         const preset = BACKGROUND_PRESETS[next.background.preset] || BACKGROUND_PRESETS.default;
         bg.style.backgroundImage = preset.image;
         bg.style.backgroundSize = preset.size;
+        bg.style.backgroundColor = next.background.preset === 'solid' ? solidColorOf(next.background.solidColor) : '';
         /* 2.5.0：两层各管各的开关；循环只要有一层开着就继续跑 */
         rainLayer.style.display = next.rain.enabled ? '' : 'none';
         gridLayer.style.display = next.rain.grid ? '' : 'none';

@@ -1,0 +1,54 @@
+{
+  "product": "DSH EXV Theme",
+  "testedDshVersions": ["0.2.2"],
+  "packs": [
+    {
+      "id": "cyan-theme",
+      "title": "界面层",
+      "description": "黑色 + 主题色 HUD、背景编辑、配置预设、开场动画、全部 CSS 覆盖",
+      "group": "core",
+      "source": "${DSH_HOME}/plugins/cyan-theme",
+      "folder": "cyan-theme",
+      "bundle": "dsh-exv-cyan-theme",
+      "required": true,
+      "default": true,
+      "order": 10
+    },
+    {
+      "id": "parallax-bg",
+      "title": "背景与 Live2D",
+      "description": "视差背景、代码雨与背景网格、扫描波、15 个 Live2D 模型（自包含 38MB）",
+      "group": "core",
+      "source": "${DSH_HOME}/plugins/parallax-bg",
+      "folder": "parallax-bg",
+      "bundle": "dsh-exv-parallax-bg",
+      "required": true,
+      "default": true,
+      "order": 20
+    },
+    {
+      "id": "flat-corners",
+      "title": "方角补丁",
+      "description": "把宿主的圆角统一改成方角，纯 CSS，无运行时开销",
+      "group": "core",
+      "source": "${DSH_HOME}/plugins/flat-corners",
+      "folder": "flat-corners",
+      "bundle": "dsh-exv-flat-corners",
+      "required": true,
+      "default": true,
+      "order": 30
+    },
+    {
+      "id": "visual",
+      "title": "视觉增强包",
+      "description": "实时 2K 开场动画、无极调色、超高清背景卡片（Battlefield 3 六张）与卡片文件夹",
+      "group": "visual",
+      "source": "${WORKLOAD}/theme-visual",
+      "folder": "theme-visual",
+      "bundle": "dsh-exv-theme-visual",
+      "required": false,
+      "default": true,
+      "order": 40
+    }
+  ]
+}

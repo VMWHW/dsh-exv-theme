@@ -1,6 +1,6 @@
 {
   "name": "dsh-exv-flat-corners",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "type": "module",
   "description": "Removes every corner radius from the DSH Web interface.",
   "license": "MIT",
