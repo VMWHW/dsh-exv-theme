@@ -18,15 +18,19 @@ static class Program
     [STAThread]
     static void Main(string[] rawArgs)
     {
-        bool silent = false, noBoot = false;
+        bool silent = false, noBoot = false, uninstallMode = false, autoInstall = false;
         string packArg = null;
         string selftest = null;
+        string homeArg = null;
         foreach (string a in rawArgs)
         {
             if (a.Equals("/S", StringComparison.OrdinalIgnoreCase)) silent = true;
+            else if (a.Equals("/UNINSTALL", StringComparison.OrdinalIgnoreCase)) uninstallMode = true;
+            else if (a.Equals("/AUTOINSTALL", StringComparison.OrdinalIgnoreCase)) autoInstall = true;
             else if (a.Equals("/NOBOOT", StringComparison.OrdinalIgnoreCase)) noBoot = true;
             else if (a.StartsWith("/PACKS=", StringComparison.OrdinalIgnoreCase)) packArg = a.Substring(7);
             else if (a.StartsWith("/SELFTEST=", StringComparison.OrdinalIgnoreCase)) selftest = a.Substring(10);
+            else if (a.StartsWith("/DSHHOME=", StringComparison.OrdinalIgnoreCase)) homeArg = a.Substring(9);
         }
         try { SetProcessDPIAware(); } catch { }
         Application.EnableVisualStyles();
@@ -45,13 +49,22 @@ static class Program
             try { File.WriteAllLines(selftest, lines.ToArray(), new UTF8Encoding(false)); } catch { }
             return;
         }
+        if (silent && uninstallMode)
+        {
+            Ui.Installer.Extract(Path.Combine(Path.GetTempPath(), "dsh-exv-setup-" + Process.GetCurrentProcess().Id), null);
+            List<string> allIds = new List<string>();
+            foreach (Ui.PackInfo pack in ui.Packs) allIds.Add(pack.Id);
+            Ui.Installer.RunScript("uninstall.ps1", allIds, null, null, homeArg);
+            return;
+        }
         if (silent)
         {
-            bool ok = Ui.Installer.Run(ui, ui.DefaultPackIds(), true, null, null);
+            Ui.Installer.TryTrace("silent start packs=" + ui.Packs.Count + " home=" + (homeArg == null ? "null" : homeArg));
+            bool ok = Ui.Installer.Run(ui, ui.DefaultPackIds(), true, null, null, homeArg);
             if (ok && !noBoot) Ui.Installer.LaunchDsh();
             return;
         }
-        Application.Run(new Ui.SetupForm(ui, packArg));
+        Application.Run(new Ui.SetupForm(ui, packArg, homeArg, autoInstall));
     }
 
     [DllImport("user32.dll")]
@@ -129,9 +142,13 @@ namespace Ui
     public class SetupForm : Form
     {
         readonly Manifest ui;
+        readonly string dshHome;
+        readonly bool autoStart;
         readonly List<string> selected = new List<string>();
         bool bootAfter = false;      // 默认不勾：和主流安装器一致
         bool busy, finished, failed;
+        bool finishing, hoverDanger, installed;
+        Rectangle rUninstall;
         string status = "准备就绪";
         int step, stepTotal;
         readonly List<string> logLines = new List<string>();
@@ -140,13 +157,16 @@ namespace Ui
         readonly List<KeyValuePair<Rectangle, PackInfo>> rows = new List<KeyValuePair<Rectangle, PackInfo>>();
         int hoverRow = -1;
         bool hoverStart, hoverClose;
+        bool hoverUninstall;
         Point dragOffset;
         bool dragging;
         Process running;
 
-        public SetupForm(Manifest m, string presetPacks)
+        public SetupForm(Manifest m, string presetPacks, string dshHome, bool autoStart)
         {
             ui = m;
+            this.dshHome = dshHome;
+            this.autoStart = autoStart;
             foreach (PackInfo p in ui.Packs) if (p.Required || p.Default) selected.Add(p.Id);
             if (!string.IsNullOrEmpty(presetPacks))
             {
@@ -156,19 +176,41 @@ namespace Ui
             }
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(880, 640);
+            ClientSize = new Size(940, 690);
             DoubleBuffered = true;
             BackColor = Palette.Bg;
             Text = ui.Product + " " + ui.Version + " 安装器";
+            installed = DetectInstalled();
             SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint | ControlStyles.OptimizedDoubleBuffer, true);
-            pump.Interval = 260;
+            pump.Interval = 120;
             pump.Tick += delegate { Pump(); };
+        }
+
+        bool HasOptional()
+        {
+            foreach (PackInfo pack in ui.Packs) if (!pack.Required) return true;
+            return false;
+        }
+
+        bool DetectInstalled()
+        {
+            try
+            {
+                string home = Path.Combine(string.IsNullOrEmpty(dshHome) ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".dsh") : dshHome, "plugins");
+                foreach (PackInfo pack in ui.Packs)
+                {
+                    string folder = pack.Id == "visual" ? "theme-visual" : pack.Id;
+                    if (Directory.Exists(Path.Combine(home, folder))) return true;
+                }
+            }
+            catch { }
+            return false;
         }
 
         Font F(float size, bool bold, bool mono)
         {
             string family = mono ? "Consolas" : "Microsoft YaHei UI";
-            float h = mono ? size * 0.95f : size;
+            float h = mono ? size * 1.06f : size * 1.16f;
             return new Font(family, h, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point);
         }
 
@@ -179,6 +221,77 @@ namespace Ui
                 string dir = Path.Combine(Path.GetTempPath(), "dsh-exv-setup-" + Process.GetCurrentProcess().Id);
                 return dir;
             }
+        }
+
+        [System.Runtime.InteropServices.DllImport("dwmapi.dll")]
+        static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+        protected override void OnHandleCreated(EventArgs e)
+        {
+            base.OnHandleCreated(e);
+            try { int preference = 1; DwmSetWindowAttribute(Handle, 33, ref preference, sizeof(int)); }
+            catch { }
+        }
+
+        readonly System.Windows.Forms.Timer scanTimer = new System.Windows.Forms.Timer();
+        float scanProgress = -1f;
+
+        void StartScanWave()
+        {
+            scanProgress = 0f;
+            scanTimer.Interval = 16;
+            scanTimer.Tick += delegate
+            {
+                scanProgress += 0.022f;
+                if (scanProgress >= 1f) { scanProgress = -1f; scanTimer.Stop(); }
+                Invalidate();
+            };
+            scanTimer.Start();
+        }
+
+        void DrawSteps(Graphics g, int x, int y)
+        {
+            string[] steps = { "关闭 DSH", "校验载荷", "复制插件", "更新 profile", "重新链接", "完成" };
+            int phase = finished && !failed ? 5 : (step <= 1 ? 0 : (step <= 2 ? 1 : (step <= 3 ? 2 : (step <= 4 ? 3 : 4))));
+            float sx = x;
+            using (Font sf = F(8.2f, false, true))
+            {
+                for (int i = 0; i < steps.Length; i++)
+                {
+                    string label = "0" + (i + 1) + " " + steps[i];
+                    bool active = i == Math.Min(phase, steps.Length - 1);
+                    if (active)
+                    {
+                        SizeF size = g.MeasureString(label, sf);
+                        using (SolidBrush chip = new SolidBrush(Palette.Alpha(Palette.Accent, 30)))
+                            g.FillRectangle(chip, sx - 4, y - 2, size.Width + 8, size.Height + 2);
+                        using (SolidBrush on = new SolidBrush(Palette.Accent)) g.DrawString(label, sf, on, sx, y);
+                        sx += size.Width + 16;
+                    }
+                    else
+                    {
+                        using (SolidBrush off = new SolidBrush(Palette.Alpha(Palette.Dim, 190))) g.DrawString(label, sf, off, sx, y);
+                        sx += g.MeasureString(label, sf).Width + 16;
+                    }
+                }
+            }
+        }
+
+        void DrawScanWave(Graphics g)
+        {
+            if (scanProgress < 0f) return;
+            float bandH = 90f;
+            float y = -bandH + (Height + bandH) * scanProgress;
+            using (LinearGradientBrush band = new LinearGradientBrush(
+                new Rectangle(0, (int)y, Width, (int)bandH),
+                Palette.Alpha(Palette.Accent, 0), Palette.Alpha(Palette.Accent, 30), LinearGradientMode.Vertical))
+                g.FillRectangle(band, 0, y, Width, bandH);
+            using (LinearGradientBrush tail = new LinearGradientBrush(
+                new Rectangle(0, (int)(y + bandH), Width, 16),
+                Palette.Alpha(Palette.Accent, 60), Palette.Alpha(Palette.Accent, 0), LinearGradientMode.Vertical))
+                g.FillRectangle(tail, 0, y + bandH, Width, 16);
+            using (Pen core = new Pen(Palette.Alpha(Palette.Accent, 150), 1f))
+                g.DrawLine(core, 0, y + bandH - 1, Width, y + bandH - 1);
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -213,13 +326,13 @@ namespace Ui
                 g.DrawString("✕", cf, cb, rClose.X + 5, rClose.Y + 2);
 
             // 标题
-            using (Font title = new Font("Microsoft YaHei UI", 20f, FontStyle.Bold, GraphicsUnit.Point))
+            using (Font title = new Font("Microsoft YaHei UI", 23f, FontStyle.Bold, GraphicsUnit.Point))
             using (SolidBrush white = new SolidBrush(Palette.Text))
                 g.DrawString(finished ? (failed ? "安装失败" : "安装完成") : (busy ? "正在安装" : "安装 " + ui.Product), title, white, 28, 58);
 
             using (Font sub = F(9.5f, false, false))
             using (SolidBrush dim = new SolidBrush(Palette.Dim))
-                g.DrawString(busy ? status : "离线一键安装 · 勾选要装的增强包 · 不写入 Windows 卸载项", sub, dim, 30, 104);
+                g.DrawString(busy ? status : (HasOptional() ? "离线一键安装 · 勾选要装的增强包 · 不写入 Windows 卸载项" : "离线一键安装 · 自动装齐三个子插件 · 不写入 Windows 卸载项"), sub, dim, 30, 104);
 
             // 分割线
             using (Pen line = new Pen(Palette.Line, 1)) g.DrawLine(line, 30, 136, Width - 30, 136);
@@ -239,9 +352,13 @@ namespace Ui
                     g.DrawString("安装完成后启动 DSH", f, b, 56, by + 9);
                 }
             }
+            rUninstall = new Rectangle(Width - 342, by + 2, 120, 44);
+            if (!busy && installed) DrawDanger(g, rUninstall, finishing ? "卸载中…" : "一键卸载", !finishing, hoverUninstall);
             rStart = new Rectangle(Width - 210, by + 2, 180, 44);
             DrawButton(g, rStart, finished ? (failed ? "关闭" : "完成") : (busy ? "安装中…" : "开始安装"),
                 !busy && (finished || selected.Count > 0), hoverStart);
+
+            DrawScanWave(g);
 
             if (finished)
             {
@@ -257,13 +374,19 @@ namespace Ui
             int y = 158;
             foreach (PackInfo p in ui.Packs)
             {
-                Rectangle row = new Rectangle(30, y, Width - 60, 62);
+                Rectangle row = new Rectangle(30, y, Width - 60, 70);
                 rows.Add(new KeyValuePair<Rectangle, PackInfo>(row, p));
                 bool on = selected.Contains(p.Id);
                 bool hot = hoverRow == rows.Count - 1;
-                using (SolidBrush bg = new SolidBrush(hot ? Palette.Alpha(Palette.Accent, 14) : Palette.Panel))
-                    g.FillRectangle(bg, row);
-                using (Pen edge = new Pen(on ? Color.FromArgb(90, Palette.Accent) : Palette.Alpha(Color.White, 18), 1))
+                if (on)
+                {
+                    for (int glow = 6; glow >= 1; glow -= 1)
+                        using (Pen halo = new Pen(Palette.Alpha(Palette.Accent, 6 + glow * 2), 1))
+                            g.DrawRectangle(halo, row.X - glow, row.Y - glow, row.Width - 1 + glow * 2, row.Height - 1 + glow * 2);
+                }
+                Color fill = on ? Palette.Alpha(Palette.Accent, 26) : (hot ? Palette.Alpha(Palette.Accent, 12) : Palette.Panel);
+                using (SolidBrush bg = new SolidBrush(fill)) g.FillRectangle(bg, row);
+                using (Pen edge = new Pen(on ? Color.FromArgb(210, Palette.Accent) : Palette.Alpha(Color.White, 18), on ? 2 : 1))
                     g.DrawRectangle(edge, row.X, row.Y, row.Width - 1, row.Height - 1);
 
                 Rectangle box = new Rectangle(row.X + 16, row.Y + 21, 20, 20);
@@ -291,12 +414,12 @@ namespace Ui
                     SizeF sz = g.MeasureString(ver, vf);
                     g.DrawString(ver, vf, vb, row.Right - sz.Width - 14, row.Y + 22);
                 }
-                y += 70;
+                y += 78;
             }
 
             using (Font f = F(8.6f, false, false))
             using (SolidBrush b = new SolidBrush(Palette.Alpha(Palette.Dim, 200)))
-                g.DrawString("本体三个包为必装项；增强包可自由勾选，之后重跑安装器即可增减。已验证的 DSH 版本：" + ui.Dsh, f, b,
+                g.DrawString(HasOptional() ? "本体三个包为必装项；增强包可自由勾选，之后重跑安装器即可增减。已验证的 DSH 版本：" + ui.Dsh : "三个包会自动全部装上；之后重跑安装器可以修复或卸载。已验证的 DSH 版本：" + ui.Dsh, f, b,
                     new RectangleF(30, y + 2, Width - 60, 34));
 
             // 流程提示：填掉下方空白，也让人一眼知道安装器会动什么
@@ -328,23 +451,21 @@ namespace Ui
             int fill = stepTotal <= 0 ? 0 : (int)(w * (step / (double)stepTotal));
             if (fill < 4) fill = 4;
             using (SolidBrush bar = new SolidBrush(Palette.Accent)) g.FillRectangle(bar, x, 158, fill, 6);
-            using (Font f = F(9.5f, false, false))
-            using (SolidBrush b = new SolidBrush(Palette.Accent))
-                g.DrawString(stepTotal > 0 ? ("第 " + Math.Min(step, stepTotal) + " / " + stepTotal + " 步") : "", f, b, x, 170);
+            DrawSteps(g, x, 174);
 
-            Rectangle box = new Rectangle(x, 200, w, Height - 200 - 100);
-            using (SolidBrush bg = new SolidBrush(Color.FromArgb(2, 0, 0, 0))) g.FillRectangle(bg, box);
-            using (Pen edge = new Pen(Palette.Line, 1)) g.DrawRectangle(edge, box);
+            Rectangle box = new Rectangle(x, 206, w, Height - 206 - 100);
+            using (SolidBrush bg = new SolidBrush(Color.FromArgb(150, 0, 0, 0))) g.FillRectangle(bg, box);
+            using (Pen edge = new Pen(Color.FromArgb(70, Palette.Accent), 1)) g.DrawRectangle(edge, box);
             using (Font mono = new Font("Consolas", 9f, FontStyle.Regular, GraphicsUnit.Point))
             using (SolidBrush fb = new SolidBrush(Palette.Alpha(Palette.Text, 225)))
             {
-                float lineH = mono.GetHeight(g) + 1;
+                float lineH = mono.GetHeight(g) + 2;
                 int maxLines = (int)((box.Height - 16) / lineH);
                 int start = Math.Max(0, logLines.Count - maxLines);
                 float ly = box.Y + 8;
                 for (int i = start; i < logLines.Count; i++)
                 {
-                    g.DrawString(logLines[i], mono, fb, box.X + 10, ly);
+                    g.DrawString(logLines[i], mono, fb, box.X + 12, ly);
                     ly += lineH;
                 }
             }
@@ -363,6 +484,18 @@ namespace Ui
             }
         }
 
+        void DrawDanger(Graphics g, Rectangle r, string text, bool enabled, bool hot)
+        {
+            Color red = Color.FromArgb(255, 97, 97);
+            using (SolidBrush bg = new SolidBrush(hot && enabled ? Palette.Alpha(red, 56) : Palette.Alpha(red, 14)))
+                g.FillRectangle(bg, r);
+            using (Pen edge = new Pen(enabled ? red : Palette.Alpha(red, 70), 1)) g.DrawRectangle(edge, r);
+            using (Font f = new Font("Microsoft YaHei UI", 11.5f, FontStyle.Bold, GraphicsUnit.Point))
+            using (SolidBrush fg = new SolidBrush(enabled ? red : Palette.Alpha(red, 90)))
+            using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
+                g.DrawString(text, f, fg, r, sf);
+        }
+
         void DrawButton(Graphics g, Rectangle r, string text, bool enabled, bool hot)
         {
             // 主按钮常态就是实色主题青 + 黑字，悬停翻成近白——和主题里「青底黑字」的按钮同一套语言。
@@ -376,7 +509,7 @@ namespace Ui
             using (SolidBrush bg = new SolidBrush(fill)) g.FillRectangle(bg, r);
             using (Pen edge = new Pen(enabled ? Palette.Accent : Palette.Alpha(Palette.Dim, 90), 1))
                 g.DrawRectangle(edge, r);
-            using (Font f = new Font("Microsoft YaHei UI", 11f, FontStyle.Bold, GraphicsUnit.Point))
+            using (Font f = new Font("Microsoft YaHei UI", 12.5f, FontStyle.Bold, GraphicsUnit.Point))
             using (SolidBrush fg = new SolidBrush(ink))
             using (StringFormat sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center })
                 g.DrawString(text, f, fg, r, sf);
@@ -409,9 +542,10 @@ namespace Ui
             for (int i = 0; i < rows.Count; i++) if (rows[i].Key.Contains(e.Location)) hoverRow = i;
             bool prevStart = hoverStart, prevClose = hoverClose;
             hoverStart = rStart.Contains(e.Location);
+            hoverUninstall = rUninstall.Contains(e.Location);
             hoverClose = rClose.Contains(e.Location);
-            Cursor = (hoverStart || hoverClose || hoverRow >= 0) ? Cursors.Hand : Cursors.Default;
-            if (prevRow != hoverRow || prevStart != hoverStart || prevClose != hoverClose) Invalidate();
+            Cursor = (hoverStart || hoverUninstall || hoverClose || hoverRow >= 0) ? Cursors.Hand : Cursors.Default;
+            if (prevRow != hoverRow || prevStart != hoverStart || prevClose != hoverClose || hoverUninstall) Invalidate();
         }
 
         protected override void OnMouseDown(MouseEventArgs e)
@@ -447,12 +581,46 @@ namespace Ui
                 Invalidate();
                 return;
             }
+            if (rUninstall.Contains(e.Location) && !finishing) { StartUninstall(); return; }
             if (rStart.Contains(e.Location) && selected.Count > 0) StartInstall();
+        }
+
+        void StartUninstall()
+        {
+            if (busy || finishing) return;
+            finishing = true; busy = true; finished = false; failed = false;
+            logLines.Clear();
+            status = "正在卸载…";
+            step = 0; stepTotal = 4;
+            Invalidate();
+            List<string> ids = new List<string>();
+            foreach (PackInfo pack in ui.Packs) ids.Add(pack.Id);
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                try
+                {
+                    Installer.Extract(ExeDir, null);
+                    bool ok = Installer.RunScript("uninstall.ps1", ids, delegate (string line) { Post(delegate { AddLog(line); }); }, null, dshHome);
+                    Post(delegate
+                    {
+                        finishing = false; busy = false; finished = true; failed = !ok;
+                        if (ok) installed = false;
+                        status = ok ? "卸载完成" : "卸载失败";
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Post(delegate { AddLog("错误：" + ex.Message); finishing = false; busy = false; finished = true; failed = true; });
+                }
+            });
+            pump.Start();
         }
 
         void StartInstall()
         {
+            if (busy || finishing) return;
             busy = true; finished = false; failed = false;
+            StartScanWave();
             logLines.Clear();
             status = "解包安装载荷…";
             step = 0; stepTotal = ui.Packs.Count + 4;
@@ -470,11 +638,11 @@ namespace Ui
                     bool ok = Ui.Installer.Run(ui, ids, true, delegate (string line)
                     {
                         Post(delegate { AddLog(line); });
-                    }, null);
+                    }, null, dshHome);
                     if (ok)
                     {
                         if (bootAfter) Installer.LaunchDsh();
-                        Post(delegate { finished = true; failed = false; busy = false; step = stepTotal; status = "完成"; });
+                        Post(delegate { finished = true; failed = false; busy = false; step = stepTotal; installed = true; status = "完成"; });
                     }
                     else
                     {
@@ -489,7 +657,9 @@ namespace Ui
             pump.Start();
         }
 
-        void Post(Action action) { BeginInvoke(action); }
+        /* 跨线程不改控件：统一塞进队列，由 pump 定时器在 UI 线程上执行。 */
+        readonly System.Collections.Concurrent.ConcurrentQueue<Action> pending = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        void Post(Action action) { if (action != null) pending.Enqueue(action); }
 
         void AddLog(string line)
         {
@@ -502,7 +672,24 @@ namespace Ui
             Invalidate();
         }
 
-        void Pump() { if (finished) pump.Stop(); }
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            if (autoStart && selected.Count > 0) StartInstall();
+        }
+
+        void Pump()
+        {
+            Action action;
+            bool ran = false;
+            while (pending.TryDequeue(out action))
+            {
+                try { action(); } catch { }
+                ran = true;
+            }
+            if (ran || busy || finished) Invalidate();
+            if (finished) pump.Stop();
+        }
     }
 
     // ---- 安装引擎驱动 -------------------------------------------------------
@@ -540,16 +727,24 @@ namespace Ui
             if (progress != null) progress(100, "载荷解包完成");
         }
 
-        public static bool Run(Manifest ui, List<string> packs, bool noLaunch, Action<string> onLine, string logPath)
+        public static bool Run(Manifest ui, List<string> packs, bool noLaunch, Action<string> onLine, string logPath, string dshHome)
+        {
+            return RunScript("install.ps1", packs, onLine, logPath, dshHome);
+        }
+
+        public static bool RunScript(string scriptName, List<string> packs, Action<string> onLine, string logPath, string dshHome)
         {
             string dir = Path.Combine(Path.GetTempPath(), "dsh-exv-setup-" + Process.GetCurrentProcess().Id);
-            string script = Path.Combine(dir, "install.ps1");
+            string script = Path.Combine(dir, scriptName);
+            /* 静默模式不会先走界面里那一步解包，这里兜底解一次。 */
+            if (!File.Exists(script)) Extract(dir, null);
             string log = logPath ?? Path.Combine(dir, "install.log");
             StringBuilder args = new StringBuilder();
             args.Append("-NoProfile -ExecutionPolicy Bypass -File \"").Append(script).Append("\"");
             args.Append(" -NoLaunch");
             if (packs != null && packs.Count > 0) args.Append(" -Packs ").Append(string.Join(",", packs.ToArray()));
             args.Append(" -LogPath \"").Append(log).Append("\"");
+            if (!string.IsNullOrEmpty(dshHome)) args.Append(" -DshHomeOverride \"").Append(dshHome).Append("\"");
 
             ProcessStartInfo psi = new ProcessStartInfo("powershell.exe", args.ToString());
             psi.UseShellExecute = false;
@@ -559,29 +754,69 @@ namespace Ui
             psi.StandardOutputEncoding = Encoding.UTF8;
             psi.StandardErrorEncoding = Encoding.UTF8;
 
-            long readPos = 0;
+            TryTrace("run args=" + args.ToString());
             using (Process p = Process.Start(psi))
             {
-                // 排空 stdout/stderr（不读会堵住子进程的管道），真正显示的文字走 UTF-8 日志文件。
-                p.OutputDataReceived += delegate { };
-                p.ErrorDataReceived += delegate { };
+                TryTrace("started pid=" + p.Id);
+                /* 直接吃子进程的 stdout（脚本里已经把 Console 输出设成 UTF-8），
+                   不再一边读文件一边并发读，避免日志重复。 */
+                p.OutputDataReceived += delegate (object sender, DataReceivedEventArgs ev)
+                {
+                    if (ev.Data != null && onLine != null) onLine(ev.Data);
+                };
+                p.ErrorDataReceived += delegate (object sender, DataReceivedEventArgs ev)
+                {
+                    if (ev.Data != null && onLine != null) onLine(ev.Data);
+                };
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
-                System.Threading.Thread t = new System.Threading.Thread(delegate ()
+                /* PowerShell 偶尔把自己的 stdout 挂住不退出；引擎在跑完时会写 <日志>.done，
+                   以标记为准，最多等 10 分钟。 */
+                string donePath = log + ".done";
+                for (int wait = 0; wait < 6000; wait += 1)
                 {
-                    while (!p.HasExited)
+                    if (File.Exists(donePath) || p.HasExited) break;
+                    try
                     {
-                        Drain(log, ref readPos, onLine);
-                        System.Threading.Thread.Sleep(180);
+                        if (File.Exists(log))
+                        {
+                            string tail = File.ReadAllText(log);
+                            bool finishedLine = tail.Contains("安装完成") || tail.Contains("卸载完成") || tail.Contains("安装失败") || tail.Contains("卸载失败");
+                            if (finishedLine && (DateTime.Now - File.GetLastWriteTime(log)).TotalSeconds > 2.5) break;
+                        }
                     }
-                });
-                t.IsBackground = true;
-                t.Start();
+                    catch { }
+                    System.Threading.Thread.Sleep(100);
+                }
+                bool engineOk = p.HasExited ? p.ExitCode == 0 : true;
+                try
+                {
+                    if (File.Exists(log))
+                    {
+                        string all = File.ReadAllText(log);
+                        if (all.Contains("安装失败") || all.Contains("卸载失败")) engineOk = false;
+                        else if (all.Contains("安装完成") || all.Contains("卸载完成")) engineOk = true;
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (File.Exists(donePath)) engineOk = File.ReadAllText(donePath).Trim() == "ok";
+                }
+                catch { }
+                try { if (!p.HasExited) p.Kill(); } catch { }
                 p.WaitForExit();
-                t.Join(1500);
-                Drain(log, ref readPos, onLine);
-                return p.ExitCode == 0;
+            return p.ExitCode == 0;
             }
+        }
+
+        public static void TryTrace(string text)
+        {
+            try
+            {
+                File.AppendAllText(Path.Combine(Path.GetTempPath(), "dsh-exv-trace.txt"), DateTime.Now.ToString("HH:mm:ss") + " " + text + Environment.NewLine);
+            }
+            catch { }
         }
 
         static void Drain(string log, ref long pos, Action<string> onLine)

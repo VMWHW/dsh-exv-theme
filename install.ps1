@@ -19,6 +19,7 @@ try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } 
 $BackupKeep = 3
 $stamp = Get-Date -Format 'yyyyMMddHHmmss'
 $logPath = if ([string]::IsNullOrWhiteSpace($LogPath)) { Join-Path $env:TEMP "dsh-exv-install-$stamp.log" } else { $LogPath }
+try { Remove-Item -LiteralPath ("$logPath.done") -Force -ErrorAction SilentlyContinue } catch { }
 
 function Write-Log([string]$Text, [string]$Color = 'Cyan') {
   $line = "[exv] $Text"
@@ -423,7 +424,9 @@ try {
     Copy-Item -LiteralPath $profileBackup -Destination $profilePkg -Force
   }
   Write-Host '如果 DSH 已被关闭，请重新打开；安装失败不会删除主题外的任何文件。' -ForegroundColor Yellow
-  exit 1
+  try { [IO.File]::WriteAllText("$logPath.done", "fail") } catch { }
+exit 1
 }
 
+try { [IO.File]::WriteAllText("$logPath.done", "ok") } catch { }
 exit 0

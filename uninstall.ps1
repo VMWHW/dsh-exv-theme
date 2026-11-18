@@ -3,6 +3,7 @@ param(
   [string]$DshHomeOverride = '',
   [string]$ManifestPath = '',
   [string[]]$Packs = @(),
+  [string]$LogPath = '',
   [switch]$NoLaunch,
   [switch]$SkipProcessStop
 )
@@ -14,7 +15,8 @@ $ErrorActionPreference = 'Stop'
 try { [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding($false) } catch { }
 $BackupKeep = 3
 $stamp = Get-Date -Format 'yyyyMMddHHmmss'
-$logPath = Join-Path $env:TEMP "dsh-exv-uninstall-$stamp.log"
+$logPath = if ([string]::IsNullOrWhiteSpace($LogPath)) { Join-Path $env:TEMP "dsh-exv-uninstall-$stamp.log" } else { $LogPath }
+try { Remove-Item -LiteralPath ("$logPath.done") -Force -ErrorAction SilentlyContinue } catch { }
 
 function Write-Log([string]$Text, [string]$Color = 'Cyan') {
   $line = "[exv] $Text"
@@ -209,7 +211,9 @@ try {
   if ($profileWritten -and $profileBackup -and (Test-Path -LiteralPath $profileBackup)) {
     Copy-Item -LiteralPath $profileBackup -Destination $profilePkg -Force
   }
-  exit 1
+  try { [IO.File]::WriteAllText("$logPath.done", "fail") } catch { }
+exit 1
 }
 
+try { [IO.File]::WriteAllText("$logPath.done", "ok") } catch { }
 exit 0

@@ -267,7 +267,10 @@ if (!has('--zip-only') && !has('--no-exe')) {
   const setupSrc = path.join(ROOT, 'installer/Setup.cs');
   if (!fs.existsSync(setupSrc)) fail('缺少 installer/Setup.cs');
   const iconPath = path.join(ROOT, 'installer/exv.ico');
-  const exePath = path.join(outDir, `DSH-EXV-Theme-${version}-Setup.exe`);
+  // exe 默认落在 _build/out：发布版要等封包节点再手动放进 dist（vv 2026-11-18 定的规矩）。
+  const exeOut = path.resolve(ROOT, arg('--exe-out', '_build/out'));
+  fs.mkdirSync(exeOut, { recursive: true });
+  const exePath = path.join(exeOut, `DSH-EXV-Theme-${version}-Setup.exe`);
   const compileArgs = [
     '/nologo', '/target:winexe', '/optimize+', '/codepage:65001',
     `/out:${exePath}`,
