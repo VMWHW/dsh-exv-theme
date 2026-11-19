@@ -114,6 +114,12 @@ window.__ModuleLoader__.load({
     };
     /* 反色（主色底上的字）按亮度选：亮色底配黑字，暗色底配白字 */
     const accentInk = (value) => (accentLuma(value) > 0.22 ? '#000000' : '#FFFFFF');
+    /* 高亮底上的字（2.6.1）：高亮底用的是 --dsh-accent-text（蓝鲸已经接近纯白），
+       再用 accent-ink 的白字就看不见了，所以这里取主色的暗版；默认青仍是纯黑，外观不变。 */
+    const accentInkSoft = (value) => {
+      const hex = accentHex(value);
+      return hex === ACCENT_DEFAULT ? '#000000' : mixHex(hex, '#000000', 0.82);
+    };
     const accentHue = (value) => {
       const [r0, g0, b0] = accentRgb(value).map((v) => v / 255);
       const max = Math.max(r0, g0, b0);
@@ -155,10 +161,21 @@ window.__ModuleLoader__.load({
       const mix = a.map((value, index) => Math.round(value + (b[index] - value) * t));
       return '#' + mix.map((value) => ('0' + Math.max(0, Math.min(255, value)).toString(16)).slice(-2)).join('').toUpperCase();
     };
-    /* 文字色：默认青保持原样；其它色卡往白里提 34%，避免蓝鲸/火焰这类中饱和色压在黑底上看不清 */
+    /* 文字色：默认青保持原样；其余色卡沿用 2.5.2 的 34% 混白——六张色卡的可见性是各自调过的，
+       不要一刀切。只有蓝鲸 #4D6BFE 例外：34% 混白后仍偏蓝、小字压在黑底上难读，
+       2.6.1 起单独把它提到接近纯白（相对亮度 >= 0.82）。 */
+    const ACCENT_TEXT_LIFT = '#4D6BFE';
     const accentTextFor = (value) => {
       const hex = accentHex(value);
-      return hex === ACCENT_DEFAULT ? hex : mixHex(hex, '#FFFFFF', 0.34);
+      if (hex === ACCENT_DEFAULT) return hex;
+      if (hex !== ACCENT_TEXT_LIFT) return mixHex(hex, '#FFFFFF', 0.34);
+      let mix = 0.34;
+      let out = mixHex(hex, '#FFFFFF', mix);
+      for (let step = 0; step < 7 && accentLuma(out) < 0.82; step += 1) {
+        mix = Math.min(0.95, mix + 0.09);
+        out = mixHex(hex, '#FFFFFF', mix);
+      }
+      return out;
     };
     /* 底色：默认青仍是纯黑；其它色卡往自己的色系里混 8%，得到很暗但不死黑的底 */
     const accentBgFor = (value) => {
@@ -184,6 +201,7 @@ window.__ModuleLoader__.load({
         root.style.setProperty('--dsh-accent', hex);
         root.style.setProperty('--dsh-accent-rgb', r + ',' + g + ',' + b);
         root.style.setProperty('--dsh-accent-ink', accentInk(hex));
+        root.style.setProperty('--dsh-accent-ink-soft', accentInkSoft(hex));
         root.style.setProperty('--dsh-accent-text', accentTextFor(hex));
         root.style.setProperty('--dsh-accent-text-rgb', rgbTriplet(accentTextFor(hex)));
         root.style.setProperty('--dsh-bg-base', accentBgFor(hex));
@@ -452,8 +470,10 @@ const THEME_DEFAULTS = {
       };
     };
     window.__DSH_EXV__ = window.__DSH_EXV__ || themeCreateStore();
-    /* 主色只在启动时应用一次：改主色要保存后重启 DSH 才生效。
-       （CSS 变量、画布取色、开场动画滤镜都在启动阶段定下来，避免运行中整页重算。） */
+    /* 主色只在启动时应用一次：改主色要保存后重启 DSH 才生效（这是设计：CSS 变量、画布取色、
+       开场动画滤镜都在启动阶段定下来，运行中不整页重算）。预设 / 色卡 / 无极调色写的是同一个
+       theme.accent 字段，所以切完预设要点「应用 / 保存」，重启后才是预设的颜色；
+       应用时如果主色变了，面板底部会亮红字「主色将在重启 DSH 后生效」。 */
     try {
       applyAccent(window.__DSH_EXV__.get().theme.accent);
     } catch (error) { /* ignore */ }
@@ -1171,9 +1191,13 @@ resize();
         teardown.forEach((fn) => { try { fn(); } catch (error) { /* ignore */ } });
         teardown.length = 0;
         try { if (handle) handle.finish(); } catch (error) { /* ignore */ }
+        /* 2.6.1：收场瞬间就别再吃指针——淡出的 200ms 里点输入框不该被这层半透明黑挡住、
+           也不该被 preventDefault 掉（那一次点击原本是给输入框的）。 */
+        host.style.pointerEvents = 'none';
         host.style.opacity = '0';
         window.setTimeout(() => {
           if (host.parentNode) host.parentNode.removeChild(host);
+          refreshComposerIme();
         }, 200);
 
       };
@@ -1345,7 +1369,7 @@ const VV_OPTIONS = [
     ];
 
     const css = [
-      ':root { --dsh-accent: #00FFF0; --dsh-accent-rgb: 0,255,240; --dsh-accent-ink: #000000; --dsh-accent-text: #00FFF0; --dsh-accent-text-rgb: 0,255,240; --dsh-bg-base: #000000; --dsh-bg-base-rgb: 0,0,0; }',
+      ':root { --dsh-accent: #00FFF0; --dsh-accent-rgb: 0,255,240; --dsh-accent-ink: #000000; --dsh-accent-ink-soft: #000000; --dsh-accent-text: #00FFF0; --dsh-accent-text-rgb: 0,255,240; --dsh-bg-base: #000000; --dsh-bg-base-rgb: 0,0,0; }',
       'body { background-color: var(--dsh-bg-base) !important; }',
       'body {',
       '  --dsw-alias-link: var(--dsh-accent-text) !important;',
@@ -1423,8 +1447,8 @@ const VV_OPTIONS = [
          的空白新会话页（主题的 [data-dsh-composer] 还没标上）也能吃到同一套样式。 */
       ':is([data-dsh-composer], [data-composer-card]) [class*="primary"] { background-color: rgba(var(--dsh-accent-text-rgb), 0.20) !important; color: var(--dsh-accent-text) !important; outline: 1px solid rgba(var(--dsh-accent-rgb), 0.85) !important; outline-offset: -1px !important; }',
       ':is([data-dsh-composer], [data-composer-card]) [class*="primary"] svg { color: var(--dsh-accent-text) !important; }',
-      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; box-shadow: 0 0 14px rgba(var(--dsh-accent-rgb), 0.40) !important; }',
-      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) svg { color: var(--dsh-accent-ink) !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; box-shadow: 0 0 14px rgba(var(--dsh-accent-rgb), 0.40) !important; }',
+      ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:hover:not(:disabled) svg { color: var(--dsh-accent-ink-soft) !important; }',
       ':is([data-dsh-composer], [data-composer-card]) [class*="primary"]:disabled { opacity: .55 !important; }',
       /* Selection toolbar ("引用文本"): frosted glass with a cyan hairline.
          The shipped button uses a gray floating fill; the host exposes the
@@ -1490,7 +1514,7 @@ const VV_OPTIONS = [
          这里让 select 走暗色 scheme，并把 option 的黑白反成黑底青字。 */
       'select { color-scheme: dark !important; }',
       'select option { background-color: #000 !important; color: var(--dsh-accent-text) !important; }',
-      'select option:checked { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; }',
+      'select option:checked { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; }',
       'select option:hover { background-color: rgba(var(--dsh-accent-text-rgb), 0.18) !important; color: var(--dsh-accent-text) !important; }',
       /* Settings dropdown/combobox fields: cyan tint instead of gray. */
       '[class*="_panel"]:has([class*="navCell"]) :is(select, [role="combobox"]) { background-color: rgba(var(--dsh-accent-text-rgb), 0.12) !important; color: var(--dsh-accent-text) !important; }',
@@ -1498,17 +1522,17 @@ const VV_OPTIONS = [
       /* High contrast hover: solid theme color, black label. */
       ':is(button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="treeitem"]):hover:not(:disabled):not([class*="brand"]) {',
       '  background-color: var(--dsh-accent-text) !important;',
-      '  color: var(--dsh-accent-ink) !important;',
+      '  color: var(--dsh-accent-ink-soft) !important;',
       '}',
-      ':is(button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="treeitem"]):hover:not(:disabled):not([class*="brand"]) :where(*) { color: var(--dsh-accent-ink) !important; }',
+      ':is(button, [role="button"], [role="menuitem"], [role="option"], [role="tab"], [role="treeitem"]):hover:not(:disabled):not([class*="brand"]) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* 快捷键速查：整行覆盖层是实心青色按钮，行内文字、键帽、操作图标一起转黑 */
-      'li:has(> button:enabled:hover) :where(*) { color: var(--dsh-accent-ink) !important; }',
+      'li:has(> button:enabled:hover) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* 2.2：插件管理页的插件行。悬停时整行直接实心青底黑字（和通用按钮高亮一致），
          不再叠毛玻璃——宿主里那层按钮高亮优先级很深，索性整行统一成同一种高亮。
          四个 data 属性叠加是为了压过全局 hover 的优先级。 */
       '[data-plugin-row] { transition: background-color .14s ease; }',
       '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover { background-color: var(--dsh-accent-text) !important; }',
-      '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :where(*) { color: var(--dsh-accent-ink) !important; }',
+      '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* 2.3.1：详情页组件行悬停时，行内代码/id 的深色底条也一起消掉，
          否则青底上会浮着两条黑条。 */
       '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :is(code, [class*="rowModule"], [class*="rowId"]) { background: transparent !important; border-color: transparent !important; box-shadow: none !important; }',
@@ -1518,7 +1542,7 @@ const VV_OPTIONS = [
          原来只有 --dsw-alias-interactive-bg-hover 的淡色底，和详情页的整行高亮不一致。 */
       '[data-plugin-package], [data-plugin-item] { transition: background-color .14s ease; }',
       '[data-plugin-package][data-plugin-package]:hover, [data-plugin-item][data-plugin-item]:hover { background-color: var(--dsh-accent-text) !important; }',
-      '[data-plugin-package][data-plugin-package]:hover :where(*), [data-plugin-item][data-plugin-item]:hover :where(*) { color: var(--dsh-accent-ink) !important; }',
+      '[data-plugin-package][data-plugin-package]:hover :where(*), [data-plugin-item][data-plugin-item]:hover :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* 插件图标是外部 SVG 图片，改不了颜色：悬停青底时直接反成纯黑，否则青色图标会融进青底看不见 */
       '[data-plugin-row][data-plugin-row][data-plugin-row][data-plugin-row]:hover :is(img, svg), [data-plugin-package][data-plugin-package]:hover :is(img, svg), [data-plugin-item][data-plugin-item]:hover :is(img, svg) { filter: brightness(0) !important; }',
       /* 2.3.1：青底上的开关要能看清。宿主开关是 36x20 的胶囊 + 16px 圆点，
@@ -1528,7 +1552,7 @@ const VV_OPTIONS = [
       /* 2.4.0：插件详情页顶部「‹ 插件」返回。宿主把它放在列 flex 里，默认被拉满整行，
          主题的按钮悬停青底就铺成一条通栏；这里让它贴合内容，悬停只亮文字外的一个小矩形。 */
       'button[class*="crumb"] { align-self: flex-start !important; padding: 4px 9px !important; margin: -4px 0 -4px -9px !important; color: rgba(var(--dsh-accent-text-rgb), 0.72) !important; }',
-      'button[class*="crumb"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; }',
+      'button[class*="crumb"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; }',
       'button[class*="crumb"] :is(svg, span) { color: inherit !important; }',
       /* 2.4.0：插件详情页「版本」区，收成主题 HUD 卡片的样子（宿主默认是半透明设置卡片） */
       '[data-plugin-versions] { --dsw-alias-settings-card-fill: rgba(0, 0, 0, 0.55); --dsw-alias-settings-card-stroke: rgba(var(--dsh-accent-rgb), 0.38); }',
@@ -1556,11 +1580,11 @@ const VV_OPTIONS = [
       /* Sidebar account chip: keep the solid highlight, add a large glow. */
       '[class*="_5Qcc8a_trigger"] { transition: background-color .25s ease, box-shadow .25s ease, color .25s ease; }',
       '[class*="_5Qcc8a_trigger"][class*="_5Qcc8a_trigger"]:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(var(--dsh-accent-rgb), 0.95), 0 0 26px rgba(var(--dsh-accent-rgb), 0.90), 0 0 64px rgba(var(--dsh-accent-rgb), 0.45) !important; }',
-      '[class*="_5Qcc8a_trigger"][class*="_5Qcc8a_trigger"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink) !important; }',
+      '[class*="_5Qcc8a_trigger"][class*="_5Qcc8a_trigger"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* New session button: same highlight with the large glow. */
       '[class*="_newSession"] { transition: background-color .25s ease, box-shadow .25s ease, color .25s ease; }',
       ':is(button, [role="button"])[class*="_newSession"]:hover:not(:disabled) { box-shadow: 0 0 0 1px rgba(var(--dsh-accent-rgb), 0.95), 0 0 26px rgba(var(--dsh-accent-rgb), 0.90), 0 0 64px rgba(var(--dsh-accent-rgb), 0.45) !important; }',
-      ':is(button, [role="button"])[class*="_newSession"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink) !important; }',
+      ':is(button, [role="button"])[class*="_newSession"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* Todo dock above the composer: HUD glass; its header is a large composite
          button, so the global solid-cyan hover would flood the whole strip. */
       '[data-testid="todo-panel"] { background: rgba(0, 0, 0, 0.45) !important; border: 1px solid rgba(var(--dsh-accent-rgb), 0.35) !important; box-shadow: 0 0 18px rgba(var(--dsh-accent-rgb), 0.10) !important; }',
@@ -1600,10 +1624,10 @@ const VV_OPTIONS = [
       '[data-slot="conversation.chat.flow"] :is(button, [role="button"]):hover:not(:disabled) { background-color: rgba(0, 0, 0, 0.45) !important; color: var(--dsh-accent-text) !important; box-shadow: inset 0 0 0 1px rgba(var(--dsh-accent-rgb), 0.70), 0 0 18px rgba(var(--dsh-accent-rgb), 0.30), inset 0 0 22px rgba(var(--dsh-accent-rgb), 0.10) !important; }',
       '[data-slot="conversation.chat.flow"] :is(button, [role="button"]):hover:not(:disabled) :where(*) { color: var(--dsh-accent-text) !important; }',
       /* Edited-files card: header + file rows hover solid theme with a fade. */
-      '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; transition: background-color .18s ease !important; }',
-      '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink) !important; }',
-      '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; transition: background-color .18s ease !important; }',
-      '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink) !important; }',
+      '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important; box-shadow: none !important; transition: background-color .18s ease !important; }',
+      '[data-slot="conversation.chat.flow"] [class*="HOHHba_header"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
+      '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; transition: background-color .18s ease !important; }',
+      '[data-slot="conversation.chat.flow"] [class*="HOHHba_row"]:hover:not(:disabled) :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* 2.2：已编辑 X 个文件——母控件（卡片头）用毛玻璃，展开的文件列表用实底，
          两层一眼能分清；悬停变实心青的规则优先级更高，仍然生效。 */
       '[class*="HOHHba_card"] { background: rgba(var(--dsh-bg-base-rgb), 0.34) !important; border-color: rgba(var(--dsh-accent-text-rgb), 0.50) !important; }',
@@ -1623,8 +1647,8 @@ const VV_OPTIONS = [
       '[data-slot="conversation.chat.flow"] a, [data-slot="conversation.chat.flow"] a:visited, [data-slot="conversation.chat.flow"] [class*="_fileLink_"], [data-slot="conversation.chat.flow"] [class*="_fileMention_"] { color: var(--dsh-accent-text) !important; }',
       /* 2.2：对话区链接悬停——去掉内嵌描边/虚线下划线，整段文字连外框一起反成青底黑字 */
       '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]) { border-color: transparent !important; outline: none !important; text-decoration: none !important; }',
-      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink) !important; border-color: transparent !important; box-shadow: none !important; outline: none !important; text-decoration: none !important; }',
-      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover :where(*) { color: var(--dsh-accent-ink) !important; }',
+      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover { background-color: var(--dsh-accent-text) !important; color: var(--dsh-accent-ink-soft) !important; border-color: transparent !important; box-shadow: none !important; outline: none !important; text-decoration: none !important; }',
+      '[data-slot="conversation.chat.flow"] :is(a[href], [class*="_fileLink_"], [class*="_fileMention_"]):hover :where(*) { color: var(--dsh-accent-ink-soft) !important; }',
       /* Turn navigation rail: thicker marks, cyan hover/active glow. */
       '[class*="_marks"] [class*="_mark"]::before { height: 3px !important; }',
       '[class*="_marks"] [class*="_mark"]:hover:not(:disabled) { background-color: transparent !important; box-shadow: none !important; }',
@@ -2079,7 +2103,8 @@ const VV_OPTIONS = [
       /* 卡片复用背景编辑的 .dsh-bg-card：1:1 缩略图 + 底部名字条 */
       '.dsh-preset-card { position: relative; cursor: pointer; }',
       '.dsh-preset-card[data-factory] { border-color: rgba(var(--dsh-accent-text-rgb), 0.62); }',
-      '.dsh-preset-badge { position: absolute; top: 4px; right: 4px; z-index: 2; padding: 1px 5px; font-size: 9px; line-height: 1.5; letter-spacing: 0.06em; pointer-events: none; }',
+            '.dsh-preset-badge { position: absolute; top: 4px; right: 4px; z-index: 2; padding: 1px 5px; font-size: 9px; line-height: 1.5; letter-spacing: 0.06em; pointer-events: none; }',
+      '.dsh-preset-badge[data-kind="visual"] { top: 4px; left: 4px; right: auto; background: var(--dsh-accent); color: var(--dsh-accent-ink); border: 1px solid var(--dsh-accent-text); }',
       '.dsh-preset-badge[data-kind="default"] { background: rgba(var(--dsh-bg-base-rgb), 0.55); color: #fff; border: 1px solid #fff; }',
       '.dsh-preset-badge[data-kind="static"] { background: rgba(var(--dsh-bg-base-rgb), 0.55); color: var(--dsh-accent-text); border: 1px solid rgba(var(--dsh-accent-rgb), 0.60); }',
       '.dsh-preset-badge[data-kind="dynamic"] { background: rgba(var(--dsh-bg-base-rgb), 0.55); color: #b985ff; border: 1px solid rgba(185, 133, 255, 0.70); }',
@@ -2136,7 +2161,7 @@ const VV_OPTIONS = [
       '.dsh-bg-cards[data-overridden] > * { pointer-events: none; }',
       '.dsh-pack-swatch { flex: 0 0 auto; width: 20px; height: 20px; border: 1px solid rgba(var(--dsh-accent-rgb), 0.6); box-shadow: 0 0 10px rgba(var(--dsh-accent-rgb), 0.25); }',
       '.dsh-pack-swatch-text { font-size: 11px; letter-spacing: 0.04em; color: rgba(var(--dsh-accent-text-rgb), 0.8); }',
-      /* 2.5.2：主色要重启后才生效，保存按钮左边的红字提醒 */
+      /* 2.5.2：主色要重启后才生效时，保存按钮左边的红字提醒；2.6.1 主色即时生效后这条不再渲染，类留着备用 */
       '.dsh-bg-restart-hint { margin-right: 12px; align-self: center; color: #ff5a4d; font-size: 12px; letter-spacing: 0.04em; text-shadow: 0 0 10px rgba(255, 90, 77, 0.45); }',
       /* 2.5.2：样式 → 主题色（6 个默认色卡 + 实时预览） */
       '.dsh-accent-cards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }',
@@ -2514,6 +2539,21 @@ const VV_OPTIONS = [
     const composerEditorElement = () => {
       const card = composerCardElement();
       return (card || document).querySelector('[contenteditable="true"], textarea');
+    };
+    /* 2.6.1：重启后「先打英文才能切中文」的输入法修复。
+       Chromium 在页面加载阶段给 contenteditable 建输入法上下文时，如果期间有全屏 overlay
+       压在上面，中文合成会一直连不上，要先敲个英文再切一次输入法才恢复。做法：开机动画
+       收场、那一层彻底移除之后，如果输入框正拿着焦点、而且还是空的（说明用户还没开始写），
+       做一次 blur → focus，让浏览器重新建一次输入法上下文。用户已经在写东西就一点都不碰。 */
+    const refreshComposerIme = () => {
+      try {
+        const editor = composerEditorElement();
+        if (!editor || document.activeElement !== editor) return;
+        const busy = editor.tagName === 'TEXTAREA' ? Boolean(editor.value) : Boolean((editor.textContent || '').length);
+        if (busy) return;
+        editor.blur();
+        editor.focus();
+      } catch (error) { /* ignore */ }
     };
     const insertIntoComposer = (text) => {
       const editor = composerEditorElement();
@@ -3612,7 +3652,18 @@ const VV_OPTIONS = [
        都是开发期预渲染好的透明图层（见 _work/make-preset-art.py）。运行时只是
        按预设把需要的图层按顺序叠成 background-image，不跑 canvas、不在用户
        机器上花算力；自定义预设也一样，改的只是叠哪几层。 */
-    const presetThumbLayers = (config, art, isTemplate) => {
+    /* 2.6.0：带增强包内容的预设，缩略图要画增强包的背景，并挂一个「视觉+」角标。
+       2.6.1：这份判定同时是「应用预设走哪条规则」的唯一依据——
+       本体预设也会存一份「增强包全关」的快照（palette:false、background:'none'），
+       所以不能拿「visual 快照是否存在」当判据，只能看快照里到底有没有增强包内容。 */
+    const visualPackCfg = (visual) => (visual && visual["dsh-exv-theme-visual"]) || null;
+    const visualContentOf = (visual) => {
+      const cfg = visualPackCfg(visual);
+      if (!cfg) return false;
+      return Boolean((cfg.background && cfg.background !== "none") || cfg.palette === true);
+    };
+    const hasVisualPack = (preset) => visualContentOf(preset && preset.visual);
+    const presetThumbLayers = (config, art, isTemplate, visual) => {
       if (!art) return null;
       const c = config || {};
       const backgroundConfig = c.background || THEME_DEFAULTS.background;
@@ -3651,7 +3702,13 @@ const VV_OPTIONS = [
       }
       if (rain.grid !== false && art.grid) push('url(' + art.grid + ')', '100% 100%');
       push('linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.22))', '100% 100%');
-      if (backgroundConfig.preset === 'solid') {
+      const vCfg = visualPackCfg(visual);
+      const vBgId = vCfg && vCfg.background && vCfg.background !== "none" ? vCfg.background : "";
+      const vArt = window.__DSH_EXV_VISUAL_ART__;
+      const vBgImage = vBgId && vArt && vArt.backgrounds ? vArt.backgrounds[vBgId] : "";
+      if (vBgImage) {
+        push("url(" + vBgImage + ")", "cover");
+      } else if (backgroundConfig.preset === 'solid') {
         const solidColor = solidColorOf(backgroundConfig.solidColor);
         push('linear-gradient(' + solidColor + ', ' + solidColor + ')', '100% 100%');
       } else if (backgroundConfig.preset === 'darkness') {
@@ -4137,7 +4194,7 @@ const VV_OPTIONS = [
           },
             h('div', {
               className: 'dsh-bg-thumb',
-              style: presetThumbLayers(preset.factory ? (preset.config || THEME_DEFAULTS) : preset.config, (arts[presetAccentOf(preset)] || arts[accentCss()] || null), preset.template === true) || undefined,
+              style: presetThumbLayers(preset.factory ? (preset.config || THEME_DEFAULTS) : preset.config, (arts[presetAccentOf(preset)] || arts[accentCss()] || null), preset.template === true, preset.visual) || undefined,
             }),
             (() => {
               if (preset.factory) return h('span', { className: 'dsh-preset-badge', 'data-kind': 'default' }, '默认');
@@ -4148,6 +4205,7 @@ const VV_OPTIONS = [
               if (mode === 'none') return h('span', { className: 'dsh-preset-badge', 'data-kind': 'minimal' }, '极简');
               return h('span', { className: 'dsh-preset-badge', 'data-kind': 'static' }, '静态');
             })(),
+            hasVisualPack(preset) ? h('span', { className: 'dsh-preset-badge', 'data-kind': 'visual' }, '视觉+') : null,
             h('div', { className: 'dsh-bg-card-text' }, preset.name))),
         ),
 
@@ -4579,7 +4637,13 @@ const VV_OPTIONS = [
 
       /* 预设也只进草稿：卡片点击不写 store、不动 HUD 布局；应用 / 保存时一起生效。 */
       const loadPreset = (preset) => {
-        setDraft(themeClone(preset.factory ? (preset.config || THEME_DEFAULTS) : preset.config));
+        const base = themeClone(preset.factory ? (preset.config || THEME_DEFAULTS) : preset.config);
+        /* 2.6.1：2.5.x 留下的老预设可能没记主色——那就沿用当前主色，
+           别让「没记录」被 normalize 悄悄拽回默认青。新存的预设都带 theme.accent。 */
+        if (!base.theme || !accentValid(base.theme.accent)) {
+          base.theme = Object.assign({}, base.theme, { accent: accentCss() });
+        }
+        setDraft(base);
         pendingLayoutRef.current = preset.layout || null;
         pendingPrefsRef.current = preset.prefs && typeof preset.prefs === 'object' ? preset.prefs : null;
         pendingVisualRef.current = preset.visual && typeof preset.visual === 'object' ? preset.visual : null;
@@ -4593,11 +4657,36 @@ const VV_OPTIONS = [
         const prefs = pendingPrefsRef.current;
         const visual = pendingVisualRef.current;
         const factory = pendingFactoryRef.current;
+        /* 2.6.1：增强包的颜色接管。本体预设不带增强包内容——先把增强包恢复默认
+           （关无极调色、撤超高清背景），再写入预设自己的主色，否则 palette 会把预设色顶回去；
+           增强包预设反过来：一律打开无极调色（visual 预设的颜色都来自自定义调色）。 */
+        const visualPack = (packs || []).find((pack) => pack && pack.id === 'dsh-exv-theme-visual') || null;
+        /* 判据是「快照里有没有增强包内容」，不是「有没有 visual 快照」——
+           本体预设同样带一份「增强包全关」的快照（palette:false、background:'none'）。 */
+        const usesVisual = visualContentOf(visual);
         store.patch(themeClone(draftRef.current));
-        /* 2.6.0：主色是启动时定死的，应用后只有颜色不同才提示重启。 */
+        if (prefs) applyFunctionalPrefs(prefs);
+        if (factory) applyVisualDefaults();
+        else if (visual) applyVisualPrefs(visual);
+        else if (visualPack) {
+          try { applyVisualDefaults(); } catch (error) { /* ignore */ }
+        }
+        if (usesVisual) {
+          /* 增强包预设：无极调色一律打开，颜色由 palette 现算（本体色卡被 overrides 占住） */
+          if (visualPack && typeof visualPack.set === 'function') {
+            try { visualPack.set({ palette: true }); } catch (error) { /* ignore */ }
+          }
+        } else {
+          /* 本体预设：上面那一步可能把主色写回默认青，这里把预设自己的主色钉回去 */
+          try {
+            const wanted = accentHex((draftRef.current.theme || {}).accent);
+            if (accentHex(store.get().theme.accent) !== wanted) store.patch({ theme: { accent: wanted } });
+          } catch (error) { /* ignore */ }
+        }
+        /* 主色是启动时定死的：只有真的变了才提示重启 */
         try {
           const liveAccent = (getComputedStyle(document.documentElement).getPropertyValue('--dsh-accent') || '').trim().toUpperCase();
-          const nextAccent = solidColorOf((draftRef.current.theme || {}).accent);
+          const nextAccent = accentHex(store.get().theme.accent);
           if (liveAccent && nextAccent !== liveAccent) notify('主色将在重启 DSH 后生效');
         } catch (error) { /* 读不到就静默 */ }
         const current = themeClone(store.get());
@@ -4610,10 +4699,7 @@ const VV_OPTIONS = [
         pendingPrefsRef.current = null;
         pendingVisualRef.current = null;
         pendingFactoryRef.current = false;
-        if (prefs) applyFunctionalPrefs(prefs);
-        if (factory) applyVisualDefaults();
-        else if (visual) applyVisualPrefs(visual);
-        if (prefs || visual || factory) {
+        if (prefs || visual || factory || visualPack) {
           setPackValues(() => {
             const values = {};
             packs.forEach((pack) => {
