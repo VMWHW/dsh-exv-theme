@@ -556,6 +556,33 @@ const THEME_DEFAULTS = {
       return () => { toolsAutoRetractListeners.delete(listener); };
     };
 
+    /* 2.6.2：组件层静止。本体有一层微动效：把背景 logos 层随鼠标/呼吸漂移的位移，
+       逐帧写给每一个 .dsh-widget（applyWidgetMotion 那段 rAF），所以 HUD 组件会跟着慢慢漂。
+       打开这个开关后不再写位移，组件固定在它被摆放的位置上。
+       独立 localStorage 键 dsh-exv-widget-static，'on' = 静止（默认关，保持原来的微动效）。 */
+    const WIDGET_STATIC_KEY = 'dsh-exv-widget-static';
+    const widgetStaticListeners = new Set();
+    let widgetStaticNow = false;
+    const isWidgetStatic = () => {
+      try { return window.localStorage.getItem(WIDGET_STATIC_KEY) === 'on'; } catch (error) { return false; }
+    };
+    widgetStaticNow = isWidgetStatic();
+    const setWidgetStatic = (on) => {
+      widgetStaticNow = Boolean(on);
+      try {
+        if (widgetStaticNow) window.localStorage.setItem(WIDGET_STATIC_KEY, 'on');
+        else window.localStorage.removeItem(WIDGET_STATIC_KEY);
+      } catch (error) { /* ignore */ }
+      widgetStaticListeners.forEach((listener) => {
+        try { listener(widgetStaticNow); } catch (error) { /* 单个订阅失败不影响其它 */ }
+      });
+    };
+    const subscribeWidgetStatic = (listener) => {
+      if (typeof listener !== 'function') return () => {};
+      widgetStaticListeners.add(listener);
+      return () => { widgetStaticListeners.delete(listener); };
+    };
+
     /* env: { canvas, freeze, exposeRender, onEnd } —— 预览页和主题共用这一份 */
     function bootOverlayRun(env) {
       const canvas = env.canvas;
@@ -1197,6 +1224,8 @@ resize();
         host.style.opacity = '0';
         window.setTimeout(() => {
           if (host.parentNode) host.parentNode.removeChild(host);
+          /* 2.6.2：这一句在 1.0.0 开发期被撤过，结果「重启后先打英文才能切中文」立刻回来了；
+             它是 2.6.1 验证过的正解，接回来（只在持焦 + 空内容时动手）。 */
           refreshComposerIme();
         }, 200);
 
@@ -2157,6 +2186,21 @@ const VV_OPTIONS = [
       '.dsh-pack-back { display: flex; align-items: center; justify-content: center; }',
       '.dsh-pack-back-text { color: var(--dsh-accent-text); font-size: 26px; line-height: 1; }',
       '.dsh-pack-back .dsh-bg-card-text { background: transparent; }',
+      /* 2.6.2：增强包的「驾驶舱按钮灯」。方形实底按钮 + 下方文字标签；
+         点亮 = 完全反色（整块实心主色）+ 单独泛光。宽窗一排 6 个，窄窗自动 3×2 / 2×3。
+         选择器重复类名是为了压过全局的「按钮悬停实心主色」规则（那条是 0,4,0）。 */
+      '.dsh-lamp-strip { display: grid; grid-template-columns: repeat(6, minmax(0, 72px)); gap: 12px 10px; align-items: start; }',
+      '@media (max-width: 1024px) { .dsh-lamp-strip { grid-template-columns: repeat(3, minmax(0, 72px)); } }',
+      '@media (max-width: 720px) { .dsh-lamp-strip { grid-template-columns: repeat(2, minmax(0, 72px)); } }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 !important; background: transparent !important; border: none !important; box-shadow: none !important; cursor: pointer; }',
+      '.dsh-lamp-face { position: relative; box-sizing: border-box; width: 56px; height: 56px; display: block; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(var(--dsh-accent-rgb), 0.42); transition: background-color .14s ease, border-color .14s ease, box-shadow .18s ease; }',
+      '.dsh-lamp-inner { position: absolute; left: 50%; top: 50%; width: 60%; height: 60%; transform: translate(-50%, -50%); box-sizing: border-box; border: 1px solid rgba(var(--dsh-accent-rgb), 0.42); pointer-events: none; transition: width .2s ease, height .2s ease, border-color .2s ease; }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp:hover .dsh-lamp-inner { width: 80%; height: 80%; }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp[data-on] .dsh-lamp-inner { border-color: rgba(0, 0, 0, 0.34); }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp[data-on] .dsh-lamp-inner, .dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp[data-on]:hover .dsh-lamp-inner { width: 60%; height: 60%; }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp[data-on] .dsh-lamp-face { background: var(--dsh-accent); border-color: var(--dsh-accent); box-shadow: 0 0 0 1px rgba(var(--dsh-accent-rgb), 0.60), 0 0 18px rgba(var(--dsh-accent-rgb), 0.60), 0 0 36px rgba(var(--dsh-accent-rgb), 0.30); }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp .dsh-lamp-caption { font-size: 11px; line-height: 1.2; letter-spacing: 0.06em; color: rgba(var(--dsh-accent-text-rgb), 0.80) !important; text-shadow: none; white-space: nowrap; }',
+      '.dsh-lamp.dsh-lamp.dsh-lamp.dsh-lamp:focus-visible .dsh-lamp-face { outline: 1px solid var(--dsh-accent-text); outline-offset: 2px; }',
       '.dsh-bg-cards[data-overridden] { opacity: 0.42; filter: grayscale(1); cursor: not-allowed; }',
       '.dsh-bg-cards[data-overridden] > * { pointer-events: none; }',
       '.dsh-pack-swatch { flex: 0 0 auto; width: 20px; height: 20px; border: 1px solid rgba(var(--dsh-accent-rgb), 0.6); box-shadow: 0 0 10px rgba(var(--dsh-accent-rgb), 0.25); }',
@@ -3503,7 +3547,25 @@ const VV_OPTIONS = [
       const list = readPresets();
       const byId = new Map(list.map((preset) => [preset.id, preset]));
       let changed = false;
-      SEED_PRESETS.forEach((preset) => {
+      /* 2.6.2：增强包在加载时把自己的出厂预设 push 进 window.__DSH_EXV_PRESET_SEEDS__，
+         这里和本体自带的 SEED_PRESETS 合并；缺的补上，删掉的不复活（沿用同一个 seed 状态）。 */
+      const externalSeeds = (() => {
+        try {
+          const extra = window.__DSH_EXV_PRESET_SEEDS__;
+          return Array.isArray(extra) ? extra.filter((preset) => preset && preset.id && preset.config) : [];
+        } catch (error) { return []; }
+      })();
+      const seedFolders = new Set();
+      externalSeeds.forEach((preset) => { if (preset.folder) seedFolders.add(String(preset.folder)); });
+      if (seedFolders.size) {
+        const folderList = readFolders();
+        let folderChanged = false;
+        seedFolders.forEach((folder) => {
+          if (folderList.indexOf(folder) < 0) { folderList.push(folder); folderChanged = true; }
+        });
+        if (folderChanged) writeFolders(folderList);
+      }
+      SEED_PRESETS.concat(externalSeeds).forEach((preset) => {
         if (!preset || !preset.id || !preset.config) return;
         if (state.deleted.indexOf(preset.id) >= 0) return;
         const existing = byId.get(preset.id);
@@ -3529,6 +3591,8 @@ const VV_OPTIONS = [
           tags: preset.tags && typeof preset.tags === 'object' ? preset.tags : {},
           config: preset.config,
           layout: preset.layout && typeof preset.layout === 'object' ? preset.layout : null,
+          prefs: preset.prefs && typeof preset.prefs === 'object' ? preset.prefs : null,
+          visual: preset.visual && typeof preset.visual === 'object' ? preset.visual : null,
           builtin: true,
           template: preset.template === true,
           folder: preset.folder ? String(preset.folder) : undefined,
@@ -4397,6 +4461,10 @@ const VV_OPTIONS = [
       const [pos, setPos] = React.useState(null);
       const [panelSize, setPanelSize] = React.useState(readBgPanelSize);
       const [presets, setPresets] = React.useState(readPresets);
+      /* 增强包可能比本体晚注册出厂预设：面板每次挂载时补一次种子 */
+      React.useEffect(() => {
+        try { seedPresets(); setPresets(readPresets()); } catch (error) { /* ignore */ }
+      }, []);
       const [activePreset, setActivePreset] = React.useState(null);
       const [confirmPreset, setConfirmPreset] = React.useState(null);
       /* 关窗时还有未应用的改动 → 先问「保存 / 不保存 / 继续编辑」 */
@@ -4417,6 +4485,8 @@ const VV_OPTIONS = [
       const [bootOn, setBootOn] = React.useState(isBootEnabled);
       const [toolsAutoRetractOn, setToolsAutoRetractOn] = React.useState(isToolsAutoRetract);
       React.useEffect(() => subscribeToolsAutoRetract(setToolsAutoRetractOn), []);
+      const [widgetStaticOn, setWidgetStaticOn] = React.useState(isWidgetStatic);
+      React.useEffect(() => subscribeWidgetStatic(setWidgetStaticOn), []);
       /* 视觉增强包：每次打开面板重新检测（组件随面板挂载/卸载） */
       const packs = React.useMemo(readVisualPacks, []);
       const [packId, setPackId] = React.useState('base');
@@ -4432,6 +4502,29 @@ const VV_OPTIONS = [
       const activeSection = activePack
         ? (activePack.sections.find((section) => section.id === packNode) || activePack.sections[0] || null)
         : null;
+      /* 增强包草稿（2.6.2）：面板里的改动只进 packValues，点「应用 / 保存」才写配置；
+         「取消」回到已保存的状态。 */
+      const packStored = activePack ? (() => {
+        try { return activePack.get ? activePack.get() : {}; } catch (error) { return {}; }
+      })() : {};
+      const packDraft = activePack ? (packValues[activePack.id] || {}) : {};
+      const packDirty = Boolean(activePack) && (() => {
+        try { return JSON.stringify(packDraft) !== JSON.stringify(packStored); } catch (error) { return true; }
+      })();
+      const applyPack = () => {
+        if (!activePack) return;
+        const values = packValues[activePack.id] || {};
+        try { if (activePack.set) activePack.set(values); } catch (error) { /* ignore */ }
+        try {
+          setPackValues((previous) => ({ ...previous, [activePack.id]: activePack.get ? activePack.get() : {} }));
+        } catch (error) { /* ignore */ }
+      };
+      const cancelPack = () => {
+        if (!activePack) return;
+        try {
+          setPackValues((previous) => ({ ...previous, [activePack.id]: activePack.get ? activePack.get() : {} }));
+        } catch (error) { /* ignore */ }
+      };
       /* 设置项优先级（2.5.2）：增强包可以在 pack.overrides 里声明「我接管本体的哪个设置项」，
          形如 { 'theme.accent': '无极调色' }（键 = 本体设置项 id，值 = 增强包里的设置项名）。
          被接管的本体控件变灰、不可点，悬停提示写明被谁禁用。 */
@@ -4664,6 +4757,8 @@ const VV_OPTIONS = [
         /* 判据是「快照里有没有增强包内容」，不是「有没有 visual 快照」——
            本体预设同样带一份「增强包全关」的快照（palette:false、background:'none'）。 */
         const usesVisual = visualContentOf(visual);
+        /* 2.6.2：组件层静止也走草稿——只有点「应用 / 保存」才真正落盘并生效 */
+        setWidgetStatic(Boolean(widgetStaticOn));
         store.patch(themeClone(draftRef.current));
         if (prefs) applyFunctionalPrefs(prefs);
         if (factory) applyVisualDefaults();
@@ -4720,6 +4815,8 @@ const VV_OPTIONS = [
       const discardAndClose = () => {
         setDraft(themeClone(savedRef.current));
         setDirty(false);
+        /* 组件层静止没写进 store，取消时把面板上的开关也一起退回已保存的值 */
+        setWidgetStaticOn(isWidgetStatic());
         pendingLayoutRef.current = null;
         pendingPrefsRef.current = null;
         pendingVisualRef.current = null;
@@ -4734,6 +4831,7 @@ const VV_OPTIONS = [
         /* 已经在问「要不要保存」时，再按一次关闭 / Esc 只收掉弹窗 */
         if (confirmClose) { setConfirmClose(false); return; }
         if (activePack) {
+          if (packDirty) { setConfirmClose(true); return; }
           onClose();
           return;
         }
@@ -4801,7 +4899,7 @@ const VV_OPTIONS = [
         h('div', { className: 'dsh-bg-label' }, label),
         h('div', { className: 'dsh-bg-control' },
           fallback === undefined ? null : resetButton(fallback, applyValue, value === fallback),
-          liveTag(),
+          opts && opts.noLive ? null : liveTag(),
           h(Slider, { value, min, max, onChange: applyValue, variant }),
           opts && opts.hideValue ? null : h('div', { className: 'dsh-bg-value' }, format(value)),
         ));
@@ -4940,8 +5038,10 @@ const VV_OPTIONS = [
       const content = (() => {
         if (activePack) {
           const values = packValues[activePack.id] || {};
+          /* 2.6.2：增强包也走「草稿 → 应用 / 保存」，不再即时写配置。
+             起因：后效灯一改就重建整页滤镜，出过「关不掉 / 开了没反应」的状态错乱；
+             草稿化之后这类问题连发生的机会都没有，取消也能真正回滚。 */
           const setPackValue = (key, next) => {
-            try { if (activePack.set) activePack.set({ [key]: next }); } catch (error) { /* ignore */ }
             setPackValues((previous) => ({
               ...previous,
               [activePack.id]: { ...(previous[activePack.id] || {}), [key]: next },
@@ -4953,8 +5053,30 @@ const VV_OPTIONS = [
               return h('div', { className: 'dsh-bg-hint' }, item.text);
             }
             if (item.type === 'switch') {
-              /* 增强包设置全部即时生效，跟基座的滑条一样挂「即时」标记 */
-              return liveRow(item.label, h(Switch, { on: value !== false, onChange: (next) => setPackValue(item.key, next) }));
+              return row(item.label, h(Switch, { on: value !== false, onChange: (next) => setPackValue(item.key, next) }));
+            }
+            if (item.type === 'lamps') {
+              /* 2.6.2：增强包的「驾驶舱按钮灯」。一排方形实线框，点一下常亮并单独泛光，
+                 再点熄灭；可以多选。写回配置的数组顺序永远按 options 的先后，
+                 以后要做固定顺序的后效叠加链，直接读这个顺序就行。 */
+              const lampList = Array.isArray(value) ? value : [];
+              const lampOrder = (item.options || []).map((option) => option.id);
+              return row(item.label, h('div', { className: 'dsh-lamp-strip' },
+                (item.options || []).map((option) => h('button', {
+                  key: option.id,
+                  type: 'button',
+                  className: 'dsh-lamp',
+                  'data-on': lampList.indexOf(option.id) >= 0 ? '' : undefined,
+                  title: option.hint || ('切换「' + option.label + '」'),
+                  onClick: () => {
+                    const next = lampList.indexOf(option.id) >= 0
+                      ? lampList.filter((id) => id !== option.id)
+                      : lampList.concat([option.id]);
+                    setPackValue(item.key, lampOrder.filter((id) => next.indexOf(id) >= 0));
+                  },
+                },
+                  h('span', { className: 'dsh-lamp-face' }, h('span', { className: 'dsh-lamp-inner' })),
+                  h('span', { className: 'dsh-lamp-caption' }, option.label)))));
             }
             if (item.type === 'slider') {
               const sliderDisabled = typeof item.disabled === 'function' ? Boolean(item.disabled(values)) : false;
@@ -4964,7 +5086,7 @@ const VV_OPTIONS = [
                   h('div', { className: 'dsh-bg-control' },
                     h('span', { className: 'dsh-slider-disabled-hint' }, item.disabledHint || '当前大小下这个方向没有可移动余地')));
               }
-              return sliderRow(item.label, value, item.min, item.max, (next) => setPackValue(item.key, next), (v) => `${v}${item.unit || ''}`, item.defaultValue, item.variant, { hideValue: item.hideValue });
+              return sliderRow(item.label, value, item.min, item.max, (next) => setPackValue(item.key, next), (v) => `${v}${item.unit || ''}`, item.defaultValue, item.variant, { hideValue: item.hideValue, noLive: true });
             }
             if (item.type === 'cards') {
               return h(PackCardGrid, { item, value, onChange: (id) => setPackValue(item.key, id) });
@@ -5006,7 +5128,7 @@ const VV_OPTIONS = [
                   h('div', { className: 'dsh-accent-preview-track' }, h('span', null))));
             }
             if (item.type === 'segmented') {
-              return liveRow(item.label, h(Segmented, {
+              return row(item.label, h(Segmented, {
                 options: item.options || [],
                 value: String(value),
                 onChange: (id) => setPackValue(item.key, id),
@@ -5016,7 +5138,6 @@ const VV_OPTIONS = [
           };
           const section = activeSection;
           return h('div', { className: 'dsh-bg-section' },
-            h('div', { className: 'dsh-bg-hint' }, '增强包设置即时生效，不进草稿，也不用点应用。'),
             section ? h('div', {
               key: section.id || section.title,
               className: 'dsh-bg-pack-section',
@@ -5310,7 +5431,12 @@ const VV_OPTIONS = [
               on: toolsAutoRetractOn,
               onChange: (next) => setToolsAutoRetract(next),
             })),
-            h('div', { className: 'dsh-bg-hint' }, '打开模式后按钮自动收成图标；关掉后保持展开，要不要挡住下面的东西由你自己决定。'));
+            h('div', { className: 'dsh-bg-hint' }, '打开模式后按钮自动收成图标；关掉后保持展开，要不要挡住下面的东西由你自己决定。'),
+            row('组件层静止', h(Switch, {
+              on: widgetStaticOn,
+              onChange: (next) => { setWidgetStaticOn(next); setDirty(true); },
+            })),
+            h('div', { className: 'dsh-bg-hint' }, '打开后 HUD 组件不再跟随鼠标和呼吸缓慢漂移，固定在摆放的位置上。'));
         }
 
         return null;
@@ -5476,11 +5602,15 @@ const VV_OPTIONS = [
           ),
           h('div', { className: 'dsh-bg-foot' },
             h('span', null, activePack
-              ? '增强包设置即时生效'
+              ? (packDirty ? '有未应用的修改' : '设置已同步')
               : pendingLayout ? '预设已载入，点应用生效' : dirty ? '有未应用的修改' : '设置已同步'),
             h('div', { className: 'dsh-bg-foot-actions' },
               activePack
-                ? h('button', { type: 'button', className: 'dsh-bg-btn', onClick: requestClose }, '关闭')
+                ? [
+                  h('button', { key: 'pack-save', type: 'button', className: 'dsh-bg-btn', 'data-primary': '', onClick: () => { applyPack(); onClose(); } }, '保存'),
+                  h('button', { key: 'pack-cancel', type: 'button', className: 'dsh-bg-btn', onClick: () => { cancelPack(); onClose(); } }, '取消'),
+                  h('button', { key: 'pack-apply', type: 'button', className: 'dsh-bg-btn', disabled: !packDirty, onClick: applyPack }, '应用'),
+                ]
                 : [
                   node === 'presets' && activePreset && !activePreset.factory && !activePreset.builtin
                     ? h('button', {
@@ -5514,13 +5644,19 @@ const VV_OPTIONS = [
                 h('button', {
                   type: 'button',
                   className: 'dsh-bg-btn',
-                  onClick: () => { setConfirmClose(false); discardAndClose(); },
+                  onClick: () => {
+                    setConfirmClose(false);
+                    if (activePack) { cancelPack(); onClose(); } else { discardAndClose(); }
+                  },
                 }, '不保存'),
                 h('button', {
                   type: 'button',
                   className: 'dsh-bg-btn',
                   'data-primary': '',
-                  onClick: () => { setConfirmClose(false); save(); },
+                  onClick: () => {
+                    setConfirmClose(false);
+                    if (activePack) { applyPack(); onClose(); } else { save(); }
+                  },
                 }, '保存')))) : null,
           h('div', {
             className: 'dsh-bg-resize',
@@ -7313,12 +7449,24 @@ const VV_OPTIONS = [
         let lastY = Number.POSITIVE_INFINITY;
         let collectedAt = 0;
         let nodes = [];
+        let staticCleared = false;
         const collect = () => {
           nodes = Array.from(document.querySelectorAll('.dsh-widget'));
           collectedAt = performance.now();
         };
         const apply = (now) => {
           frame = window.requestAnimationFrame(apply);
+          /* 2.6.2：组件层静止——不跟随背景漂移，固定在摆放位置；
+             刚打开开关时把上一次写进内联样式的位移清掉一次。 */
+          if (widgetStaticNow) {
+            if (!staticCleared) {
+              if (now - collectedAt > 1500) collect();
+              for (const el of nodes) { try { if (el.style.transform) el.style.transform = ''; } catch (error) { /* ignore */ } }
+              staticCleared = true;
+            }
+            return;
+          }
+          staticCleared = false;
           const motion = window.__dshWidgetMotion;
           if (!motion) return;
           const moved = Math.abs(motion.x - lastX) + Math.abs(motion.y - lastY);

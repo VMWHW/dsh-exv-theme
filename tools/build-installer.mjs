@@ -30,15 +30,20 @@ const stageDir = path.resolve(ROOT, arg('--stage', '_build/installer'));
 const outDir = path.resolve(ROOT, arg('--out', 'dist'));
 const SKIP_FILES = new Set(['client.template.js', '.DS_Store', 'Thumbs.db']);
 const SKIP_DIRS = new Set(['node_modules', '.git', '.github', '.vscode']);
+/* --name / --version：打「增强包单独 zip」时用（本体 VERSION.txt 与增强包版本不同）。
+   例：--packs visual --zip-only --name DSH-EXV-Visual --version 1.0.0 */
+const productName = arg('--name', 'DSH-EXV-Theme');
 
-const version = fs.readFileSync(path.join(ROOT, 'VERSION.txt'), 'utf8').trim();
+const version = (arg('--version', '') || fs.readFileSync(path.join(ROOT, 'VERSION.txt'), 'utf8')).trim();
 if (!version) throw new Error('VERSION.txt 为空');
 
 const config = JSON.parse(fs.readFileSync(path.join(ROOT, 'tools/packs.build.json'), 'utf8'));
 const expand = (p) => p.replace('${DSH_HOME}', DSH_HOME).replace('${WORKLOAD}', WORKLOAD);
 
 const packs = config.packs
-  .filter((p) => p.required || only.includes(p.group) || only.includes(p.id))
+  /* 只按显式清单筛：这样 --packs visual 能打出「只有增强包」的 zip，
+     不会被 required 的核心包强行带进来。 */
+  .filter((p) => only.includes(p.group) || only.includes(p.id))
   .sort((a, b) => (a.order || 0) - (b.order || 0));
 
 function log(msg) { console.log('[build] ' + msg); }
@@ -247,7 +252,7 @@ const sha = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest
 
 // ---- 7. 传统 zip 通道 -------------------------------------------------------
 if (!has('--no-zip')) {
-  const zipPath = path.join(outDir, `DSH-EXV-Theme-${version}.zip`);
+  const zipPath = path.join(outDir, `${productName}-${version}.zip`);
   const zipEntries = listFiles(stageDir)
     .filter((rel) => rel !== 'payload.zip')
     .sort()
@@ -270,7 +275,7 @@ if (!has('--zip-only') && !has('--no-exe')) {
   // exe 默认落在 _build/out：发布版要等封包节点再手动放进 dist（vv 2026-11-18 定的规矩）。
   const exeOut = path.resolve(ROOT, arg('--exe-out', '_build/out'));
   fs.mkdirSync(exeOut, { recursive: true });
-  const exePath = path.join(exeOut, `DSH-EXV-Theme-${version}-Setup.exe`);
+  const exePath = path.join(exeOut, `${productName}-${version}-Setup.exe`);
   const compileArgs = [
     '/nologo', '/target:winexe', '/optimize+', '/codepage:65001',
     `/out:${exePath}`,

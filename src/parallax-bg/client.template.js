@@ -341,6 +341,16 @@ const THEME_DEFAULTS = {
 
     const BREATH_GROUP = { bg: 'background', rain: 'rain', logos: 'logos', vv: 'vv' };
 
+    /* 背景网格的点阵是 CSS 里的 SVG data URL，颜色写死在 URL 里、吃不到 CSS 变量，
+       所以按当前主色重新拼这条规则；2.6.2 起网格跟随主题色。 */
+    const gridRule = (hex) => '#dsh-parallax .pl-grid { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2722%27%20height=%2722%27%3E%3Crect%20x=%276.75%27%20y=%270.75%27%20width=%2714.5%27%20height=%2714.5%27%20fill=%27none%27%20stroke=%27%23' + String(hex || ACCENT_DEFAULT).replace('#', '').toLowerCase() + '%27%20stroke-opacity=%270.18%27%20stroke-width=%271.5%27/%3E%3C/svg%3E"); background-size: 22px 22px; transition: opacity .16s ease; }';
+    const syncGridAccent = () => {
+      try {
+        const st = document.querySelector('style[data-dsh-parallax]');
+        if (!st) return;
+        st.textContent = st.textContent.replace(/#dsh-parallax \.pl-grid \{[^}]*\}/, gridRule(accentHexNow));
+      } catch (error) { /* ignore */ }
+    };
     const css = [
       'html, body { background: transparent !important; }',
       '#root { position: relative; z-index: 1; background: transparent !important; }',
@@ -352,10 +362,12 @@ const THEME_DEFAULTS = {
       '#dsh-parallax .pl { position: absolute; inset: -5%; will-change: transform; }',
       '#dsh-parallax .pl[data-layer="logos"], #dsh-parallax .pl[data-layer="vv"] { inset: 0; }',
       '#dsh-parallax .pl-bg { position: absolute; inset: 0; background-repeat: no-repeat; background-size: cover; background-position: center; transform: scale(1.06); }',
-      '#dsh-parallax .pl-grid { position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg%20xmlns=%27http://www.w3.org/2000/svg%27%20width=%2722%27%20height=%2722%27%3E%3Crect%20x=%276.75%27%20y=%270.75%27%20width=%2714.5%27%20height=%2714.5%27%20fill=%27none%27%20stroke=%27%2300fff0%27%20stroke-opacity=%270.18%27%20stroke-width=%271.5%27/%3E%3C/svg%3E"); background-size: 22px 22px; transition: opacity .16s ease; }',
+      gridRule(ACCENT_DEFAULT),
       '#dsh-parallax .pl-grid-layer, #dsh-parallax .pl-rain-layer { position: absolute; inset: 0; }',
       '#dsh-parallax .pl-grid-layer canvas, #dsh-parallax .pl-rain-layer canvas { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }',
       '#dsh-parallax .pl-logos { position: absolute; top: 64px; right: 36px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; transform-origin: top right; }',
+      /* 2.6.2：logo 层抬到暗角层（z-index 9）之上，右上角标志不再被暗角压暗 */
+      '#dsh-parallax .pl[data-layer="logos"] { z-index: 10; }',
       '#dsh-parallax .pl-logo { display: block; width: 150px; height: auto; opacity: 1; filter: drop-shadow(0 0 10px rgba(var(--dsh-accent-rgb, 0,255,240), 0.35)); }',
       '#dsh-parallax .pl-wordmark { display: block; width: 150px; height: auto; opacity: 1; }',
       '#dsh-parallax .pl-vv-wrap { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: center; }',
@@ -1438,6 +1450,8 @@ const THEME_DEFAULTS = {
       let config = store ? store.get() : null;
       /* 主色只在启动时读一次：换色要重启 DSH 才生效（与 cyan 一致） */
       accentHexNow = accentHexOf(config);
+      /* 网格点阵跟着主色走（CSS 里的 data URL 不能吃变量，只能整条规则重写） */
+      syncGridAccent();
 
       const rainControl = startRain(canvas, gridCanvas, () => config, () => (config && config.vv.mode !== 'none' ? vv : null));
 
