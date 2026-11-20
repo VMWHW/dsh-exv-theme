@@ -17,7 +17,7 @@
     {
       "id": "parallax-bg",
       "title": "背景与 Live2D",
-      "description": "视差背景、代码雨与背景网格、扫描波、15 个 Live2D 模型（自包含 38MB）",
+      "description": "视差背景、代码雨与格阵、扫描波、15 个 Live2D 模型（自包含 38MB）",
       "group": "core",
       "source": "${DSH_HOME}/plugins/parallax-bg",
       "folder": "parallax-bg",
