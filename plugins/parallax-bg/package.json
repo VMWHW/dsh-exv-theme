@@ -1,6 +1,6 @@
 {
   "name": "dsh-exv-parallax-bg",
-  "version": "2.6.2",
+  "version": "2.7.0",
   "type": "module",
   "description": "Adaptive layered backdrop with mouse parallax.",
   "license": "MIT",

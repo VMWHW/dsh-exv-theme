@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using System.Drawing.Text;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -136,6 +137,90 @@ namespace Ui
         public static readonly Color Dim = Color.FromArgb(126, 152, 158);
         public static readonly Color Line = Color.FromArgb(0, 255, 240, 48);
         public static Color Alpha(Color c, int a) { return Color.FromArgb(a, c.R, c.G, c.B); }
+    }
+
+    // ---- 内嵌资源（2.7.0）---------------------------------------------------
+    // LOGO 与开场动画用的两个字体内嵌进 exe：装到没装这些字体的机器上，界面也一样。
+    //   logo.png       —— 开场动画同源的新版招牌（EXV + 鲸鱼 + DEEPSEEK HARNESS），透明
+    //   font-latin.otf —— Borda Medium（英文 / 数字，品牌行用）
+    //   font-cjk.ttf   —— 方正大标宋_GBK（中文标题用）
+    static class Assets
+    {
+        static readonly object gate = new object();
+        static bool ready;
+        static Bitmap logo;
+        static FontFamily brandFamily;
+        static FontFamily displayFamily;
+
+        public static byte[] Bytes(string name)
+        {
+            try
+            {
+                using (Stream s = typeof(Assets).Assembly.GetManifestResourceStream(name))
+                {
+                    if (s == null) return null;
+                    using (MemoryStream ms = new MemoryStream())
+                    {
+                        byte[] buf = new byte[81920];
+                        int n;
+                        while ((n = s.Read(buf, 0, buf.Length)) > 0) ms.Write(buf, 0, n);
+                        return ms.ToArray();
+                    }
+                }
+            }
+            catch { return null; }
+        }
+
+        static void Init()
+        {
+            if (ready) return;
+            lock (gate)
+            {
+                if (ready) return;
+                try
+                {
+                    byte[] png = Bytes("logo.png");
+                    if (png != null && png.Length > 0) using (MemoryStream ms = new MemoryStream(png)) logo = new Bitmap(ms);
+                }
+                catch { }
+                brandFamily = LoadFamily("font-latin.otf");
+                displayFamily = LoadFamily("font-cjk.ttf");
+                ready = true;
+            }
+        }
+
+        static FontFamily LoadFamily(string resource)
+        {
+            try
+            {
+                byte[] data = Bytes(resource);
+                if (data == null || data.Length == 0) return null;
+                PrivateFontCollection pfc = new PrivateFontCollection();
+                IntPtr mem = Marshal.AllocCoTaskMem(data.Length);
+                Marshal.Copy(data, 0, mem, data.Length);
+                pfc.AddMemoryFont(mem, data.Length);
+                // 故意不 FreeCoTaskMem：字体集合要活到进程退出
+                if (pfc.Families.Length > 0) return pfc.Families[0];
+            }
+            catch { }
+            return null;
+        }
+
+        public static Bitmap Logo() { Init(); return logo; }
+
+        public static Font Brand(float size, bool bold)
+        {
+            Init();
+            if (brandFamily != null) { try { return new Font(brandFamily, size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point); } catch { } }
+            return new Font("Consolas", size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point);
+        }
+
+        public static Font Display(float size, bool bold)
+        {
+            Init();
+            if (displayFamily != null) { try { return new Font(displayFamily, size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point); } catch { } }
+            return new Font("Microsoft YaHei UI", size, bold ? FontStyle.Bold : FontStyle.Regular, GraphicsUnit.Point);
+        }
     }
 
     // ---- 主窗口 -------------------------------------------------------------
@@ -313,11 +398,23 @@ namespace Ui
                 new Rectangle(0, 0, Width, 3), Palette.Accent, Palette.Alpha(Palette.Accent, 0), LinearGradientMode.Horizontal))
                 g.FillRectangle(glow, 1, 1, Width - 2, 2);
 
-            // 品牌行
-            DrawSpaced(g, "DSH EXV THEME", 30, 26, F(9.5f, true, true), Palette.Alpha(Palette.Accent, 210), 3.6f);
+            // 头部（2.7.0）：左侧内嵌 LOGO，右侧品牌行（Borda）+ 标题（方正大标宋）。
+            // 没有内嵌资源时（老版本 exe / 资源缺失）自动退回原来的纯文字排版。
+            int titleX = 28;
+            Bitmap logo = Assets.Logo();
+            if (logo != null)
+            {
+                int lh = 72;
+                int lw = Math.Max(1, (int)Math.Round(logo.Width * (double)lh / logo.Height));
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.DrawImage(logo, new Rectangle(30, 12, lw, lh));
+                titleX = 30 + lw + 24;
+            }
+            using (Font brand = Assets.Brand(10.5f, true))
+                DrawSpaced(g, "DSH EXV THEME", titleX, 20, brand, Palette.Alpha(Palette.Accent, 210), 3.6f);
             using (Font mono = F(9, false, true))
-            using (SolidBrush dim = new SolidBrush(Palette.Dim))
-                g.DrawString(ui.Version, mono, dim, Width - 92, 25);
+            using (SolidBrush dimVer = new SolidBrush(Palette.Dim))
+                g.DrawString(ui.Version, mono, dimVer, Width - 92, 25);
 
             // 关闭按钮
             rClose = new Rectangle(Width - 46, 18, 28, 28);
@@ -325,14 +422,24 @@ namespace Ui
             using (SolidBrush cb = new SolidBrush(hoverClose ? Palette.Accent : Palette.Dim))
                 g.DrawString("✕", cf, cb, rClose.X + 5, rClose.Y + 2);
 
-            // 标题
-            using (Font title = new Font("Microsoft YaHei UI", 23f, FontStyle.Bold, GraphicsUnit.Point))
+            // 标题：中文用内嵌的方正大标宋，产品名换成 Borda，和品牌行同一支字
+            string lead = finished ? (failed ? "安装失败" : "安装完成") : (busy ? "正在安装" : "安装");
+            using (Font cjk = Assets.Display(22f, false))
+            using (Font latin = Assets.Brand(20.5f, false))
             using (SolidBrush white = new SolidBrush(Palette.Text))
-                g.DrawString(finished ? (failed ? "安装失败" : "安装完成") : (busy ? "正在安装" : "安装 " + ui.Product), title, white, 28, 58);
+            {
+                float tx = titleX - 2, ty = 44;
+                g.DrawString(lead, cjk, white, tx, ty);
+                if (!busy && !finished)
+                {
+                    SizeF leadSize = g.MeasureString(lead, cjk);
+                    g.DrawString(ui.Product, latin, white, tx + leadSize.Width + 8, ty + 3);
+                }
+            }
 
             using (Font sub = F(9.5f, false, false))
-            using (SolidBrush dim = new SolidBrush(Palette.Dim))
-                g.DrawString(busy ? status : (HasOptional() ? "离线一键安装 · 勾选要装的增强包 · 不写入 Windows 卸载项" : "离线一键安装 · 自动装齐三个子插件 · 不写入 Windows 卸载项"), sub, dim, 30, 104);
+            using (SolidBrush dimSub = new SolidBrush(Palette.Dim))
+                g.DrawString(busy ? status : (HasOptional() ? "离线一键安装 · 勾选要装的增强包 · 不写入 Windows 卸载项" : "离线一键安装 · 自动装齐三个子插件 · 不写入 Windows 卸载项"), sub, dimSub, titleX, 98);
 
             // 分割线
             using (Pen line = new Pen(Palette.Line, 1)) g.DrawLine(line, 30, 136, Width - 30, 136);

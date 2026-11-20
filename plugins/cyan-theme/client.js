@@ -1225,8 +1225,9 @@ resize();
         window.setTimeout(() => {
           if (host.parentNode) host.parentNode.removeChild(host);
           /* 2.6.2：这一句在 1.0.0 开发期被撤过，结果「重启后先打英文才能切中文」立刻回来了；
-             它是 2.6.1 验证过的正解，接回来（只在持焦 + 空内容时动手）。 */
-          refreshComposerIme();
+             它是 2.6.1 验证过的正解，接回来（只在持焦 + 空内容时动手）。
+             2.7.0：再补一层「10 秒内首次聚焦」的兜底，见 scheduleComposerImeRepair。 */
+          scheduleComposerImeRepair();
         }, 200);
 
       };
@@ -1399,6 +1400,9 @@ const VV_OPTIONS = [
 
     const css = [
       ':root { --dsh-accent: #00FFF0; --dsh-accent-rgb: 0,255,240; --dsh-accent-ink: #000000; --dsh-accent-ink-soft: #000000; --dsh-accent-text: #00FFF0; --dsh-accent-text-rgb: 0,255,240; --dsh-bg-base: #000000; --dsh-bg-base-rgb: 0,0,0; }',
+      /* 2.6.2 补：窗口最底下偶尔冒出的横向滚动条。主题里有几处绝对定位元素会横向溢出
+         （工具按钮展开、舞台/浮层贴边），右侧竖排滚动条正常，所以只裁横向。 */
+      'html, body { overflow-x: hidden !important; }',
       'body { background-color: var(--dsh-bg-base) !important; }',
       'body {',
       '  --dsw-alias-link: var(--dsh-accent-text) !important;',
@@ -2073,6 +2077,9 @@ const VV_OPTIONS = [
       '.dsh-bg-tree-icon { display: flex; align-items: center; justify-content: center; width: 13px; height: 13px; flex: none; opacity: 0.85; }',
       '.dsh-bg-tree-icon svg { display: block; }',
       '.dsh-bg-tree-item { position: relative; z-index: 1; padding: 6px 12px 6px 47px; color: rgba(var(--dsh-accent-text-rgb), 0.72); font-size: 12px; letter-spacing: 0.06em; cursor: pointer; border-left: 2px solid transparent; transition: color .14s ease; }',
+      /* 2.7.0：增强包的页签也带图标，和普通树节点同一套尺寸 */
+      '.dsh-bg-tree-item.dsh-bg-tree-pack-item { display: flex; align-items: center; gap: 8px; padding-left: 14px; }',
+      '.dsh-bg-tree-pack-item .dsh-bg-tree-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
       '.dsh-bg-tree-item:hover { background: rgba(var(--dsh-accent-rgb), 0.06); color: var(--dsh-accent-text); }',
       '.dsh-bg-tree-item[data-active] { background: rgba(var(--dsh-accent-rgb), 0.14); color: var(--dsh-accent-text); border-left-color: var(--dsh-accent-text); }',
       '.dsh-bg-tree-leaf:hover { background: transparent; }',
@@ -2598,6 +2605,28 @@ const VV_OPTIONS = [
         editor.blur();
         editor.focus();
       } catch (error) { /* ignore */ }
+    };
+    /* 2.7.0：收场后用户往往是过一会儿才点输入框。除了当时立刻修一次，
+       再盯 10 秒内的第一次聚焦补修一次，避免「这次开机又打不了中文」。 */
+    const scheduleComposerImeRepair = () => {
+      try { refreshComposerIme(); } catch (error) { /* ignore */ }
+      let done = false;
+      const onFocus = (event) => {
+        if (done) return;
+        try {
+          const card = composerCardElement();
+          if (!event.target || !card || !card.contains(event.target)) return;
+        } catch (error) { return; }
+        done = true;
+        window.removeEventListener('focusin', onFocus, true);
+        window.setTimeout(() => { try { refreshComposerIme(); } catch (error) { /* ignore */ } }, 0);
+      };
+      window.addEventListener('focusin', onFocus, true);
+      window.setTimeout(() => {
+        if (done) return;
+        done = true;
+        try { window.removeEventListener('focusin', onFocus, true); } catch (error) { /* ignore */ }
+      }, 10000);
     };
     const insertIntoComposer = (text) => {
       const editor = composerEditorElement();
@@ -4303,6 +4332,27 @@ const VV_OPTIONS = [
     /* ---- 背景编辑上次停留的位置 ------------------------------------------
        打开面板时回到上次看的设置页 / 展开的分组，不用每次从根节点重新点。 */
     const BG_VIEW_KEY = 'dsh-exv-bg-view.v1';
+    /* 2.7.0 树改版：旧 id → 新 id，读「上次停留的设置页」时映射一次；映射不到就回落默认页 */
+    const BG_NODE_ALIAS = {
+      'style/background': 'back/background',
+      'style/grid': 'grid/main',
+      'style/accent': 'hud/accent',
+      'style/vv': 'vv',
+      'style/logo': 'other/logo',
+      'style/rain': 'grid/rain',
+      'sfx/vv': 'grid/light',
+      'sfx/cursor': 'grid/light',
+      'sfx/press': 'grid/light',
+      'sfx/ripple': 'grid/ripple',
+      'motion/breathing': 'back/background',
+      'motion/rain': 'grid/rain',
+      'motion/scan': 'grid/scan',
+      'motion/ripple': 'grid/ripple',
+      'perf/rain': 'grid/main',
+      'perf/vv': 'vv',
+      'perf/modes': 'grid/scan',
+      'other/tools': 'hud/interact',
+    };
 
     /* ---- 背景编辑窗口大小（2.5.1）------------------------------------------
        面板默认就是一个固定大小，切设置页不再忽大忽小；右下角可拖拽，大小记在
@@ -4479,6 +4529,10 @@ const VV_OPTIONS = [
       const pendingLayoutRef = React.useRef(null);
       const pendingPrefsRef = React.useRef(null);
       const pendingVisualRef = React.useRef(null);
+      /* 2.7.0：这一次点「应用」是不是在套预设。没有这个标记时，apply() 分不清
+         「载入了一个不带增强包内容的预设」和「根本没载入预设」——以前的代码在后者也调
+         applyVisualDefaults()，于是单纯改个格阵开关再点应用，就会把增强包的超高清背景、调色一起清掉。 */
+      const pendingPresetRef = React.useRef(false);
       const pendingFactoryRef = React.useRef(false);
       const [pendingLayout, setPendingLayout] = React.useState(false);
       /* 开场动画开关单独存盘（localStorage.dsh-exv-boot），不走草稿 / 应用那套 */
@@ -4591,9 +4645,10 @@ const VV_OPTIONS = [
       React.useEffect(() => {
         const view = readStoredJson(BG_VIEW_KEY);
         if (!view || typeof view !== 'object') return;
-        const exists = typeof view.node === 'string' && TREE.some((group) => group.id === view.node
-          || (Array.isArray(group.children) && group.children.some((child) => child.id === view.node)));
-        if (exists) setNode(view.node);
+        const wanted = typeof view.node === 'string' ? (BG_NODE_ALIAS[view.node] || view.node) : '';
+        const exists = typeof wanted === 'string' && wanted !== '' && TREE.some((group) => group.id === wanted
+          || (Array.isArray(group.children) && group.children.some((child) => child.id === wanted)));
+        if (exists) setNode(wanted);
         /* 只恢复「关闭前最后展开的那一棵」：面板是手风琴式，任何时刻最多展开一个根节点。
            旧数据里可能存着多个 key（历史版本允许同时展开），这时优先选包含当前设置页的那组，
            否则取最后写入的那一个。 */
@@ -4603,6 +4658,11 @@ const VV_OPTIONS = [
             const owner = expanded.find((group) => (group.children || []).some((child) => child.id === view.node))
               || expanded[expanded.length - 1];
             setOpenGroups({ [owner.id]: true });
+          } else if (wanted) {
+            /* 2.7.0：旧数据的分组 id（style / sfx / motion / perf）在新树里不存在，
+               这时至少把「当前页所属的那一棵」展开，别让面板一打开像是空的。 */
+            const owner = TREE.find((group) => Array.isArray(group.children) && group.children.some((child) => child.id === wanted));
+            if (owner) setOpenGroups({ [owner.id]: true });
           }
         }
       }, []);
@@ -4741,6 +4801,7 @@ const VV_OPTIONS = [
         pendingPrefsRef.current = preset.prefs && typeof preset.prefs === 'object' ? preset.prefs : null;
         pendingVisualRef.current = preset.visual && typeof preset.visual === 'object' ? preset.visual : null;
         pendingFactoryRef.current = preset.factory === true;
+        pendingPresetRef.current = true;
         setPendingLayout(Boolean(preset.layout || preset.prefs || preset.visual));
         setDirty(true);
       };
@@ -4763,7 +4824,9 @@ const VV_OPTIONS = [
         if (prefs) applyFunctionalPrefs(prefs);
         if (factory) applyVisualDefaults();
         else if (visual) applyVisualPrefs(visual);
-        else if (visualPack) {
+        else if (visualPack && pendingPresetRef.current) {
+          /* 只有「真的套了一个不带增强包内容的预设」才把增强包恢复默认；
+             日常改设置点应用绝不能动增强包的背景与调色。 */
           try { applyVisualDefaults(); } catch (error) { /* ignore */ }
         }
         if (usesVisual) {
@@ -4794,6 +4857,7 @@ const VV_OPTIONS = [
         pendingPrefsRef.current = null;
         pendingVisualRef.current = null;
         pendingFactoryRef.current = false;
+        pendingPresetRef.current = false;
         if (prefs || visual || factory || visualPack) {
           setPackValues(() => {
             const values = {};
@@ -4821,6 +4885,7 @@ const VV_OPTIONS = [
         pendingPrefsRef.current = null;
         pendingVisualRef.current = null;
         pendingFactoryRef.current = false;
+        pendingPresetRef.current = false;
         setPendingLayout(false);
         onClose();
       };
@@ -4966,37 +5031,30 @@ const VV_OPTIONS = [
         sliderRow('呼吸幅度', breathing.amplitude, 0, 24, (next) => patchLive({ [group]: { breathing: { amplitude: next } } }), (value) => `${value}px`, THEME_DEFAULTS[group].breathing.amplitude),
       ];
 
+      /* 2.7.0：树按「实际图层 / 修改对象」重排。
+         背景 / 格阵（网格 + 跑在网格上的代码雨与各种交互光效）/ 主人物 / HUD / 其他 / 预设。
+         「性能」根取消：帧率与分辨率跟着所属对象走；呼吸也拆回各自对象页。 */
       const TREE = [
-        { id: 'style', label: '样式', children: [
-          { id: 'style/background', label: '背景' },
-          { id: 'style/grid', label: '背景网格' },
-          { id: 'style/accent', label: '主题色' },
-          { id: 'style/vv', label: '主人物' },
-          { id: 'style/logo', label: 'LOGO' },
-          { id: 'style/rain', label: '代码雨' },
+        { id: 'back', label: '背景', children: [
+          { id: 'back/background', label: '背景图' },
         ] },
-        { id: 'sfx', label: 'SFX', children: [
-          { id: 'sfx/vv', label: '人物照明' },
-          { id: 'sfx/cursor', label: '光标照明' },
-          { id: 'sfx/press', label: '拖拽照明' },
-          { id: 'sfx/ripple', label: '涟漪亮度' },
+        { id: 'grid', label: '格阵', children: [
+          { id: 'grid/main', label: '格阵' },
+          { id: 'grid/rain', label: '代码雨' },
+          { id: 'grid/light', label: '照明' },
+          { id: 'grid/ripple', label: '涟漪' },
+          { id: 'grid/scan', label: '扫描波' },
         ] },
-        { id: 'motion', label: '动效', children: [
-          { id: 'motion/breathing', label: '呼吸与位移' },
-          { id: 'motion/rain', label: '代码雨' },
-          { id: 'motion/scan', label: '扫描波' },
-          { id: 'motion/ripple', label: '涟漪' },
+        { id: 'vv', label: '主人物' },
+        { id: 'hud', label: 'HUD', children: [
+          { id: 'hud/interact', label: '交互' },
+          { id: 'hud/accent', label: '主题色' },
         ] },
-        { id: 'perf', label: '性能', children: [
-          { id: 'perf/rain', label: '背景网格' },
-          { id: 'perf/vv', label: '主人物' },
-          { id: 'perf/modes', label: '2D / 3D' },
+        { id: 'other', label: '其他', children: [
+          { id: 'other/logo', label: 'LOGO' },
+          { id: 'other/boot', label: '开场动画' },
         ] },
         { id: 'presets', label: '预设' },
-        { id: 'other', label: '其他', children: [
-          { id: 'other/boot', label: '开场动画' },
-          { id: 'other/tools', label: '工具按钮' },
-        ] },
       ];
 
       const nodeLabel = (() => {
@@ -5024,7 +5082,33 @@ const VV_OPTIONS = [
           'aria-hidden': 'true',
         };
         if (id === 'style') return h('svg', common, h('path', { d: 'M6 1.4 10.6 6 6 10.6 1.4 6Z' }));
+        /* 2.7.0 新根：背景（方框）、格阵（网点）、主人物（人形）、HUD（直角框 + 一条肩线） */
+        if (id === 'back') return h('svg', common, h('path', { d: 'M1.6 2.4h8.8v7.2H1.6z' }), h('path', { d: 'M1.6 5.2 6 2.6l4.4 2.6' }));
+        if (id === 'grid') return h('svg', common,
+          h('circle', { cx: '2.6', cy: '2.6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '6', cy: '2.6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '9.4', cy: '2.6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '2.6', cy: '6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '6', cy: '6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '9.4', cy: '6', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '2.6', cy: '9.4', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '6', cy: '9.4', r: '0.9', fill: 'currentColor', stroke: 'none' }),
+          h('circle', { cx: '9.4', cy: '9.4', r: '0.9', fill: 'currentColor', stroke: 'none' }));
+        if (id === 'vv') return h('svg', common,
+          h('circle', { cx: '6', cy: '3.1', r: '1.8' }),
+          h('path', { d: 'M2.4 10.6c0-2 1.6-3.4 3.6-3.4s3.6 1.4 3.6 3.4' }));
+        if (id === 'hud') return h('svg', common,
+          h('path', { d: 'M1.6 3.2h8.8v6.4H1.6z' }),
+          h('path', { d: 'M1.6 3.2h4.2v1.6H1.6z', fill: 'currentColor', stroke: 'none' }));
         if (id === 'sfx') return h('svg', common, h('path', { d: 'M6 1.2 7 5 10.8 6 7 7 6 10.8 5 7 1.2 6 5 5Z' }));
+        /* 增强包页签的图标（2.7.0）：按 section id 取，pack 里也可以用 section.icon 指定 */
+        if (id === 'boot') return h('svg', common, h('path', { d: 'M4.4 2.7 9.3 6 4.4 9.3Z', fill: 'currentColor', stroke: 'none' }));
+        if (id === 'effects' || id === 'fx') return h('svg', common,
+          h('path', { d: 'M6 1.2 7 5 10.8 6 7 7 6 10.8 5 7 1.2 6 5 5Z' }));
+        if (id === 'background') return h('svg', common, h('path', { d: 'M1.6 2.4h8.8v7.2H1.6z' }), h('path', { d: 'M1.6 5.2 6 2.6l4.4 2.6' }));
+        if (id === 'accent') return h('svg', common,
+          h('circle', { cx: '6', cy: '6', r: '3.3' }),
+          h('circle', { cx: '6', cy: '6', r: '1.15', fill: 'currentColor', stroke: 'none' }));
         if (id === 'motion') return h('svg', common, h('path', { d: 'M1.2 7.8c1.3 0 1.3-3.8 2.6-3.8s1.3 3.8 2.6 3.8 1.3-3.8 2.6-3.8' }));
         if (id === 'perf') return h('svg', common, h('path', { d: 'M1.8 9a4.2 4.2 0 0 1 8.4 0' }), h('path', { d: 'M6 9 7.8 5.6' }), h('circle', { cx: '6', cy: '9', r: '0.9', fill: 'currentColor', stroke: 'none' }));
         /* 其他：三个点，跟其它根节点一样是 12×12 的细线 / 实心小件 */
@@ -5156,7 +5240,7 @@ const VV_OPTIONS = [
             h('div', { className: 'dsh-bg-empty-title' }, '展开左侧分组，选择一个设置页'),
             h('div', { className: 'dsh-bg-hint' }, '改动只进草稿；保存 / 应用后生效，预设也一样。'));
         }
-        if (node === 'style/accent') {
+        if (node === 'hud/accent') {
           const accentValue = accentHex(draft.theme && draft.theme.accent);
           const cards = ACCENT_PRESETS.map((preset) => {
             const active = accentValue === preset.hex;
@@ -5209,7 +5293,7 @@ const VV_OPTIONS = [
             h('div', { className: 'dsh-accent-preview-tip' }, '更多颜色由增强包的无极调色板提供。'));
         }
 
-        if (node === 'style/background') {
+        if (node === 'back/background') {
           const solidHsl = hexToHsl(draft.background.solidColor);
           const bgOptions = BACKGROUND_OPTIONS.map((option) => (
             option.id === 'solid' ? Object.assign({}, option, { thumb: solidThumb(draft.background.solidColor) }) : option
@@ -5233,10 +5317,12 @@ const VV_OPTIONS = [
                     (next) => patchLive({ background: { solidColor: hslToHex(solidHsl[0], solidHsl[1], next) } }),
                     (value) => value + '%', 9),
                   h('div', { className: 'dsh-bg-hint' }, '当前颜色：' + solidColorOf(draft.background.solidColor)))
-              : null);
+              : null,
+            groupTitle('位移呼吸'),
+            ...breathingRows('background', draft.background.breathing));
         }
 
-        if (node === 'style/vv') {
+        if (node === 'vv') {
           const mode = draft.vv.mode;
           const vvGlance = draft.vv.glance || { enabled: true, expression: true };
           const live2dId = draft.vv.live2d || 'ar15_4508';
@@ -5277,97 +5363,50 @@ const VV_OPTIONS = [
                 ] : []),
               ] : []),
             ] : []),
+            groupTitle('动态性能'),
+            row('动态帧率', h(Segmented, {
+              options: LIVE2D_FPS_OPTIONS,
+              value: String(draft.vv.fps),
+              onChange: (id) => patch({ vv: { fps: Number(id) } }),
+            })),
+            mode === 'live2d' ? null : h('div', { className: 'dsh-bg-hint' }, '当前主人物不是动态模式，帧率切到动态后生效。'),
+            groupTitle('位移呼吸'),
+            ...breathingRows('vv', draft.vv.breathing),
           );
         }
 
-        if (node === 'style/logo') {
+        if (node === 'other/logo') {
           return h('div', { className: 'dsh-bg-section' },
             cardList(LOGO_OPTIONS, draft.logos.preset, (id) => patch({ logos: { preset: id } })),
             row('显示 LOGO', h(Switch, { on: draft.logos.enabled, onChange: (next) => patch({ logos: { enabled: next } }) })),
-            sliderRow('LOGO 大小', draft.logos.size, 75, 225, (next) => patchLive({ logos: { size: next } }), (value) => `${value}px`, THEME_DEFAULTS.logos.size));
+            sliderRow('LOGO 大小', draft.logos.size, 75, 225, (next) => patchLive({ logos: { size: next } }), (value) => `${value}px`, THEME_DEFAULTS.logos.size),
+            groupTitle('位移呼吸'),
+            ...breathingRows('logos', draft.logos.breathing));
         }
 
-        if (node === 'style/rain') {
+        if (node === 'grid/rain') {
           return h('div', { className: 'dsh-bg-section' },
+            h('div', { className: 'dsh-bg-hint' }, '代码雨是沿着格阵的格点轨道落的，格阵关掉时它照样能跑，但看起来会失去参照。'),
             row('显示代码雨', h(Switch, { on: draft.rain.enabled, onChange: (next) => patch({ rain: { enabled: next } }) })),
             row('代码雨模式', h(Segmented, {
               options: RAIN_CHAR_OPTIONS,
               value: draft.rain.charMode,
               onChange: (id) => patch({ rain: { charMode: id } }),
-            })));
-        }
-
-        if (node === 'style/grid') {
-          return h('div', { className: 'dsh-bg-section' },
-            row('显示背景网格', h(Switch, { on: draft.rain.grid, onChange: (next) => patch({ rain: { grid: next } }) })),
-            sliderRow('网格亮度', draft.rain.gridBrightness, 0, 200, (next) => patchLive({ rain: { gridBrightness: next } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBrightness),
-            row('亮度呼吸', h(Switch, { on: draft.rain.gridBreathing.enabled, onChange: (next) => patch({ rain: { gridBreathing: { enabled: next } } }) })),
-            sliderRow('亮度强度', draft.rain.gridBreathing.strength, 0, 100, (next) => patchLive({ rain: { gridBreathing: { strength: next } } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBreathing.strength));
-        }
-
-        if (node === 'sfx/vv') {
-          const light = draft.vv.light || { range: 50, strength: 50 };
-          return h('div', { className: 'dsh-bg-section' },
-            groupTitle('方格照亮'),
-            sliderRow('照亮范围', light.range, 0, 100, (next) => patchLive({ vv: { light: { range: next } } }), (value) => `${value}px`, THEME_DEFAULTS.vv.light.range),
-            sliderRow('照亮强度', light.strength, 0, 100, (next) => patchLive({ vv: { light: { strength: next } } }), (value) => `${value}`, THEME_DEFAULTS.vv.light.strength));
-        }
-
-        if (node === 'sfx/cursor') {
-          const light = draft.pointer.light;
-          return h('div', { className: 'dsh-bg-section' },
-            row('照明效果', h(Switch, { on: light.enabled, onChange: (next) => patch({ pointer: { light: { enabled: next } } }) })),
-            sliderRow('照明亮度', light.brightness, 0, 200, (next) => patchLive({ pointer: { light: { brightness: next } } }), (value) => `${value}`, THEME_DEFAULTS.pointer.light.brightness),
-            sliderRow('照明范围', light.radius, 0, 120, (next) => patchLive({ pointer: { light: { radius: next } } }), (value) => `${value}px`, THEME_DEFAULTS.pointer.light.radius));
-        }
-
-        if (node === 'sfx/press') {
-          const press = draft.pointer.press || { enabled: true, strength: 100 };
-          return h('div', { className: 'dsh-bg-section' },
-            row('拖拽照明', h(Switch, { on: press.enabled, onChange: (next) => patch({ pointer: { press: { enabled: next } } }) })),
-            sliderRow('拖拽强度', press.strength, 0, 200, (next) => patchLive({ pointer: { press: { strength: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.press.strength));
-        }
-
-        if (node === 'sfx/ripple') {
-          const ripple = draft.pointer.ripple;
-          return h('div', { className: 'dsh-bg-section' },
-            sliderRow('涟漪亮度', ripple.brightness, 0, 200, (next) => patchLive({ pointer: { ripple: { brightness: next } } }), (value) => `${value}`, THEME_DEFAULTS.pointer.ripple.brightness));
-        }
-
-        if (node === 'motion/breathing') {
-          return h('div', { className: 'dsh-bg-section' },
-            groupTitle('背景'),
-            ...breathingRows('background', draft.background.breathing),
-            groupTitle('代码雨'),
-            ...breathingRows('rain', draft.rain.breathing),
-            groupTitle('LOGO'),
-            ...breathingRows('logos', draft.logos.breathing),
-            groupTitle('主人物'),
-            ...breathingRows('vv', draft.vv.breathing));
-        }
-
-        if (node === 'motion/rain') {
-          return h('div', { className: 'dsh-bg-section' },
+            })),
             sliderRow('密度', draft.rain.density, 25, 200, (next) => patchLive({ rain: { density: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.density),
-            sliderRow('下落速度', draft.rain.speed, 25, 200, (next) => patchLive({ rain: { speed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.speed));
+            sliderRow('下落速度', draft.rain.speed, 25, 200, (next) => patchLive({ rain: { speed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.speed),
+            groupTitle('位移呼吸'),
+            ...breathingRows('rain', draft.rain.breathing));
         }
 
-        if (node === 'motion/scan') {
+        if (node === 'grid/main') {
           return h('div', { className: 'dsh-bg-section' },
-            sliderRow('扫描速度', draft.rain.scanSpeed, 25, 200, (next) => patchLive({ rain: { scanSpeed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.scanSpeed));
-        }
-
-        if (node === 'motion/ripple') {
-          const ripple = draft.pointer.ripple;
-          return h('div', { className: 'dsh-bg-section' },
-            liveRow('涟漪效果', h(Switch, { on: ripple.enabled, onChange: (next) => patchLive({ pointer: { ripple: { enabled: next } } }) })),
-            sliderRow('扩散范围', ripple.radius, 0, 1100, (next) => patchLive({ pointer: { ripple: { radius: next } } }), (value) => `${value}px`, THEME_DEFAULTS.pointer.ripple.radius),
-            sliderRow('涟漪速度', ripple.speed, 25, 200, (next) => patchLive({ pointer: { ripple: { speed: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.ripple.speed));
-        }
-
-        if (node === 'perf/rain') {
-          return h('div', { className: 'dsh-bg-section' },
-            row('背景网格帧率', h(Segmented, {
+            row('显示格阵', h(Switch, { on: draft.rain.grid, onChange: (next) => patch({ rain: { grid: next } }) })),
+            sliderRow('底色亮度', draft.rain.gridBrightness, 0, 200, (next) => patchLive({ rain: { gridBrightness: next } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBrightness),
+            row('亮度呼吸', h(Switch, { on: draft.rain.gridBreathing.enabled, onChange: (next) => patch({ rain: { gridBreathing: { enabled: next } } }) })),
+            sliderRow('点亮强度', draft.rain.gridBreathing.strength, 0, 100, (next) => patchLive({ rain: { gridBreathing: { strength: next } } }), (value) => `${value}`, THEME_DEFAULTS.rain.gridBreathing.strength),
+            groupTitle('背景层性能'),
+            row('背景层帧率', h(Segmented, {
               options: RAIN_FPS_OPTIONS,
               value: String(draft.rain.fps),
               onChange: (id) => patch({ rain: { fps: Number(id) } }),
@@ -5377,31 +5416,84 @@ const VV_OPTIONS = [
               value: String(draft.rain.resolution),
               onChange: (id) => patch({ rain: { resolution: Number(id) } }),
             })),
-            h('div', { className: 'dsh-bg-hint' }, '背景层的重绘上限：网格点亮、涟漪、扫描波、光标/人物/思考照明，以及代码雨，都跟着这一档走。选 30 帧更省电，但光标照明和涟漪会略微发顿。'));
+            h('div', { className: 'dsh-bg-hint' }, '背景层只有一条循环：格阵点亮、涟漪、扫描波、各种照明和代码雨都跟着这一档走。选 30 帧更省电，但照明和涟漪会略微发顿。'));
         }
 
-        if (node === 'perf/vv') {
+        if (node === 'grid/light') {
+          const vvLight = draft.vv.light || { range: 50, strength: 50 };
+          const cursorLight = draft.pointer.light;
+          const press = draft.pointer.press || { enabled: true, strength: 100 };
           return h('div', { className: 'dsh-bg-section' },
-            row('动态帧率', h(Segmented, {
-              options: LIVE2D_FPS_OPTIONS,
-              value: String(draft.vv.fps),
-              onChange: (id) => patch({ vv: { fps: Number(id) } }),
-            })),
-            draft.vv.mode === 'live2d' ? null : h('div', { className: 'dsh-bg-hint' }, '当前主人物不是动态模式，帧率切到动态后生效。'));
+            groupTitle('人物照明'),
+            sliderRow('照亮范围', vvLight.range, 0, 100, (next) => patchLive({ vv: { light: { range: next } } }), (value) => `${value}px`, THEME_DEFAULTS.vv.light.range),
+            sliderRow('照亮强度', vvLight.strength, 0, 100, (next) => patchLive({ vv: { light: { strength: next } } }), (value) => `${value}`, THEME_DEFAULTS.vv.light.strength),
+            groupTitle('光标照明'),
+            row('照明效果', h(Switch, { on: cursorLight.enabled, onChange: (next) => patch({ pointer: { light: { enabled: next } } }) })),
+            sliderRow('照明亮度', cursorLight.brightness, 0, 200, (next) => patchLive({ pointer: { light: { brightness: next } } }), (value) => `${value}`, THEME_DEFAULTS.pointer.light.brightness),
+            sliderRow('照明范围', cursorLight.radius, 0, 120, (next) => patchLive({ pointer: { light: { radius: next } } }), (value) => `${value}px`, THEME_DEFAULTS.pointer.light.radius),
+            groupTitle('拖拽照明'),
+            row('拖拽照明', h(Switch, { on: press.enabled, onChange: (next) => patch({ pointer: { press: { enabled: next } } }) })),
+            sliderRow('拖拽强度', press.strength, 0, 200, (next) => patchLive({ pointer: { press: { strength: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.press.strength));
         }
 
-        if (node === 'perf/modes') {
+        if (node === 'sfx/cursor') {
+          return null;
+        }
+
+        if (node === 'sfx/press') {
+          return null;
+        }
+
+        if (node === 'grid/ripple') {
+          const ripple = draft.pointer.ripple;
           return h('div', { className: 'dsh-bg-section' },
+            liveRow('涟漪效果', h(Switch, { on: ripple.enabled, onChange: (next) => patchLive({ pointer: { ripple: { enabled: next } } }) })),
+            sliderRow('扩散范围', ripple.radius, 0, 1100, (next) => patchLive({ pointer: { ripple: { radius: next } } }), (value) => `${value}px`, THEME_DEFAULTS.pointer.ripple.radius),
+            sliderRow('涟漪速度', ripple.speed, 25, 200, (next) => patchLive({ pointer: { ripple: { speed: next } } }), (value) => `${value}%`, THEME_DEFAULTS.pointer.ripple.speed),
+            sliderRow('涟漪亮度', ripple.brightness, 0, 200, (next) => patchLive({ pointer: { ripple: { brightness: next } } }), (value) => `${value}`, THEME_DEFAULTS.pointer.ripple.brightness),
+            row('涟漪模式', h(Segmented, {
+              options: RIPPLE_MODE_OPTIONS,
+              value: ripple.mode,
+              onChange: (id) => patch({ pointer: { ripple: { mode: id } } }),
+            })));
+        }
+
+        if (node === 'grid/scan') {
+          return h('div', { className: 'dsh-bg-section' },
+            sliderRow('扫描速度', draft.rain.scanSpeed, 25, 200, (next) => patchLive({ rain: { scanSpeed: next } }), (value) => `${value}%`, THEME_DEFAULTS.rain.scanSpeed),
             row('扫描波模式', h(Segmented, {
               options: SCAN_MODE_OPTIONS,
               value: draft.rain.scanMode,
               onChange: (id) => patch({ rain: { scanMode: id } }),
-            })),
-            row('涟漪模式', h(Segmented, {
-              options: RIPPLE_MODE_OPTIONS,
-              value: draft.pointer.ripple.mode,
-              onChange: (id) => patch({ pointer: { ripple: { mode: id } } }),
             })));
+        }
+
+        if (node === 'motion/breathing') {
+          return null;
+        }
+
+        if (node === 'motion/rain') {
+          return null;
+        }
+
+        if (node === 'motion/scan') {
+          return null;
+        }
+
+        if (node === 'motion/ripple') {
+          return null;
+        }
+
+        if (node === 'perf/rain') {
+          return null;
+        }
+
+        if (node === 'perf/vv') {
+          return null;
+        }
+
+        if (node === 'perf/modes') {
+          return null;
         }
 
         if (node === 'presets') {
@@ -5425,7 +5517,7 @@ const VV_OPTIONS = [
             })));
         }
 
-        if (node === 'other/tools') {
+        if (node === 'hud/interact') {
           return h('div', { className: 'dsh-bg-section' },
             liveRow('按钮自动缩回', h(Switch, {
               on: toolsAutoRetractOn,
@@ -5436,7 +5528,7 @@ const VV_OPTIONS = [
               on: widgetStaticOn,
               onChange: (next) => { setWidgetStaticOn(next); setDirty(true); },
             })),
-            h('div', { className: 'dsh-bg-hint' }, '打开后 HUD 组件不再跟随鼠标和呼吸缓慢漂移，固定在摆放的位置上。'));
+            h('div', { className: 'dsh-bg-hint' }, '打开后 HUD 组件不再跟随鼠标和呼吸缓慢漂移，固定在摆放的位置上。组件的显隐 / 位置 / 缩放仍然用输入框旁那颗「组件编辑」按钮调。'));
         }
 
         return null;
@@ -5574,11 +5666,13 @@ const VV_OPTIONS = [
                     (pack.sections || []).length
                       ? (pack.sections || []).map((section) => h('div', {
                         key: section.id || section.title,
-                        className: 'dsh-bg-tree-item',
+                        className: 'dsh-bg-tree-item dsh-bg-tree-pack-item',
                         'data-active': activePack && activePack.id === pack.id && activeSection && activeSection.id === section.id ? '' : undefined,
                         role: 'button',
                         onClick: () => setPackNode(section.id),
-                      }, section.title || section.id))
+                      },
+                        h('span', { className: 'dsh-bg-tree-icon' }, treeIcon(section.icon || section.id)),
+                        h('span', { className: 'dsh-bg-tree-label' }, section.title || section.id)))
                       : h('div', { className: 'dsh-bg-hint', style: { padding: '2px 10px' } }, '这个增强包还没有设置项。'))),
                 ),
               ),

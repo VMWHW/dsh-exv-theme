@@ -272,6 +272,12 @@ if (!has('--zip-only') && !has('--no-exe')) {
   const setupSrc = path.join(ROOT, 'installer/Setup.cs');
   if (!fs.existsSync(setupSrc)) fail('缺少 installer/Setup.cs');
   const iconPath = path.join(ROOT, 'installer/exv.ico');
+  /* 2.7.0：LOGO 与开场动画用的两个字体内嵌进 exe（Setup.cs 里按资源名读）。
+     字体从本机字体目录取，不进仓库；缺失就跳过，安装器会自动退回系统字体。 */
+  const localFonts = path.join(process.env.LOCALAPPDATA || '', 'Microsoft/Windows/Fonts');
+  const fontCjk = arg('--font-cjk', path.join(localFonts, '方正大标宋_GBK.ttf'));
+  const fontLatin = arg('--font-latin', path.join(localFonts, 'BORDA MEDIUM.otf'));
+  const logoPng = path.join(ROOT, 'installer/logo.png');
   // exe 默认落在 _build/out：发布版要等封包节点再手动放进 dist（vv 2026-11-18 定的规矩）。
   const exeOut = path.resolve(ROOT, arg('--exe-out', '_build/out'));
   fs.mkdirSync(exeOut, { recursive: true });
@@ -285,6 +291,12 @@ if (!has('--zip-only') && !has('--no-exe')) {
     `/resource:${path.join(stageDir, 'ui.txt')},ui.txt`,
   ];
   if (fs.existsSync(iconPath)) compileArgs.push(`/win32icon:${iconPath}`);
+  if (fs.existsSync(logoPng)) { compileArgs.push(`/resource:${logoPng},logo.png`); log('embed logo.png'); }
+  else log('warning: 缺 installer/logo.png，安装器不显示 LOGO');
+  if (fs.existsSync(fontCjk)) { compileArgs.push(`/resource:${fontCjk},font-cjk.ttf`); log('embed font-cjk.ttf（方正大标宋_GBK）'); }
+  else log('warning: 找不到方正大标宋_GBK.ttf，中文标题退回系统字体');
+  if (fs.existsSync(fontLatin)) { compileArgs.push(`/resource:${fontLatin},font-latin.otf`); log('embed font-latin.otf（Borda Medium）'); }
+  else log('warning: 找不到 BORDA MEDIUM.otf，品牌行退回 Consolas');
   compileArgs.push(setupSrc);
   log('csc 编译中……');
   const started = Date.now();
