@@ -57,6 +57,16 @@ const IMAGES = [
   ['vvAk12', 'vv-ak12.webp', '__VV_AK12__'],
   ['vvM200', 'vv-m200.webp', '__VV_M200__'],
   ['vvAk74m', 'vv-ak74m.webp', '__VV_AK74M__'],
+  /* 2.8.0：9 张 2K 新背景（城市飞行 / 太空那批），和 vv 在 2.7.1 里挑的卡片一一对应 */
+  ['cityflight', 'cityflight.webp', '__BG_CITYFLIGHT__'],
+  ['cz5', 'cz5.webp', '__BG_CZ5__'],
+  ['deltaheavy', 'deltaheavy.webp', '__BG_DELTAHEAVY__'],
+  ['overtheclouds', 'overtheclouds.webp', '__BG_OVERTHECLOUDS__'],
+  ['planetshine', 'planetshine.webp', '__BG_PLANETSHINE__'],
+  ['solar', 'solar.webp', '__BG_SOLAR__'],
+  ['spacex', 'spacex.webp', '__BG_SPACEX__'],
+  ['spacexr', 'spacexr.webp', '__BG_SPACEXR__'],
+  ['sunofbeach', 'sunofbeach.webp', '__BG_SUNOFBEACH__'],
 ];
 
 const RUNTIME = ['live2dcubismcore.min.js', 'pixi.min.js', 'pixi-live2d-cubism4.min.js'];
