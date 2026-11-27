@@ -13,9 +13,15 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 
 const LOAD_PATH = '/dsh-exv-notepad/load';
 const SAVE_PATH = '/dsh-exv-notepad/save';
+/* 2.9.0 超级菜单「工作区」母格：列宿主的 durable workspace 注册表 + 在资源管理器里打开 */
+const WORKSPACES_PATH = '/dsh-exv-workspaces';
+const OPEN_WORKSPACE_PATH = '/dsh-exv-open-workspace';
+/* 2.9.0 超级菜单「打开路径」母格：打开使用者自己配的绝对路径（文件夹或文件） */
+const OPEN_PATH = '/dsh-exv-open-path';
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_TEXT_CHARS = 200 * 1024;
 const MAX_TODOS = 500;
@@ -186,10 +192,142 @@ export function apply(ctx) {
     }
   };
 
+  /* ---- 2.9.0 工作区（超级菜单母格 3）--------------------------------------
+     列表直接读宿主的 durable 注册表；打开走宿主自己的「在桌面打开工作区路径」
+     （和界面里那条同一条路），拿不到时退回 explorer.exe，两条路都只接受注册表里的路径。 */
+  const readRegistry = (name) => {
+    try {
+      return typeof ctx.get === 'function' ? ctx.get(name) : null;
+    } catch (error) {
+      return null;
+    }
+  };
+
+  const workspaceList = () => {
+    const registry = readRegistry('workspaceRegistry');
+    if (!registry || typeof registry.list !== 'function') return [];
+    try {
+      return registry.list().map((item) => ({
+        id: String(item && item.id ? item.id : ''),
+        title: String(item && item.title ? item.title : ''),
+        path: String(item && item.path ? item.path : ''),
+      })).filter((item) => item.path);
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const onWorkspaces = async (req, res) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405, { allow: 'GET, HEAD' });
+      res.end();
+      return;
+    }
+    sendJson(res, 200, { items: workspaceList() });
+  };
+
+  const openNativeDirectory = (target) => {
+    const command = process.platform === 'win32' ? 'explorer.exe'
+      : process.platform === 'darwin' ? 'open' : 'xdg-open';
+    const child = spawn(command, [target], { detached: true, stdio: 'ignore' });
+    child.on('error', () => { /* 打不开就算了，接口已经回了 ok */ });
+    child.unref();
+  };
+
+  const onOpenWorkspace = async (req, res) => {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { allow: 'POST' });
+      res.end();
+      return;
+    }
+    let payload = null;
+    try {
+      payload = JSON.parse((await readBody(req)) || '{}');
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: 'bad-json' });
+      return;
+    }
+    const target = payload && typeof payload.path === 'string' ? payload.path : '';
+    const known = workspaceList().find((item) => item.path === target);
+    if (!known) {
+      sendJson(res, 404, { ok: false, error: 'unknown-workspace' });
+      return;
+    }
+    let opened = false;
+    const desktop = readRegistry('sessionController');
+    if (desktop && typeof desktop.openWorkspacePath === 'function') {
+      try {
+        await desktop.openWorkspacePath({ path: known.path }, new AbortController().signal);
+        opened = true;
+      } catch (error) {
+        opened = false;
+      }
+    }
+    if (!opened) {
+      try {
+        openNativeDirectory(known.path);
+        opened = true;
+      } catch (error) {
+        opened = false;
+      }
+    }
+    if (!opened) {
+      sendJson(res, 500, { ok: false, error: 'open-failed' });
+      return;
+    }
+    sendJson(res, 200, { ok: true, path: known.path });
+  };
+
+  /* 使用者自己在「功能配置」里填的绝对路径：只认绝对路径 + 必须真实存在，
+     打开方式与工作区那条一致（平台原生打开器），不做任何路径拼接。 */
+  const isAbsoluteTarget = (value) => {
+    if (typeof value !== 'string' || !value || value.length > 1024) return false;
+    if (value.indexOf('\u0000') >= 0) return false;
+    if (process.platform === 'win32') return /^[a-zA-Z]:[\\/]/.test(value) || /^\\\\[^\\]/.test(value);
+    return value.charAt(0) === '/';
+  };
+
+  const onOpenPath = async (req, res) => {
+    if (req.method !== 'POST') {
+      res.writeHead(405, { allow: 'POST' });
+      res.end();
+      return;
+    }
+    let payload = null;
+    try {
+      payload = JSON.parse((await readBody(req)) || '{}');
+    } catch (error) {
+      sendJson(res, 400, { ok: false, error: 'bad-json' });
+      return;
+    }
+    const target = payload && typeof payload.path === 'string' ? payload.path.trim() : '';
+    if (!isAbsoluteTarget(target)) {
+      sendJson(res, 400, { ok: false, error: 'not-absolute' });
+      return;
+    }
+    let info = null;
+    try {
+      info = await fs.stat(target);
+    } catch (error) {
+      sendJson(res, 404, { ok: false, error: 'not-found' });
+      return;
+    }
+    try {
+      openNativeDirectory(target);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: 'open-failed' });
+      return;
+    }
+    sendJson(res, 200, { ok: true, path: target, kind: info && info.isDirectory() ? 'dir' : 'file' });
+  };
+
   ctx.effect(() => {
     const disposers = [
       ctx.webServer.register({ kind: 'exact', path: LOAD_PATH, handler: onLoad }),
       ctx.webServer.register({ kind: 'exact', path: SAVE_PATH, handler: onSave }),
+      ctx.webServer.register({ kind: 'exact', path: WORKSPACES_PATH, handler: onWorkspaces }),
+      ctx.webServer.register({ kind: 'exact', path: OPEN_WORKSPACE_PATH, handler: onOpenWorkspace }),
+      ctx.webServer.register({ kind: 'exact', path: OPEN_PATH, handler: onOpenPath }),
     ];
     return () => {
       for (const dispose of disposers) {

@@ -172,12 +172,40 @@ for (const model of manifest) {
   };
   const idleMeta = readMeta(model.idleName);
   const entranceMeta = readMeta(model.entranceName);
+  /* 2.8.1：动作表——每条动作的 kind / 组 / 下标 / 时长，运行期靠它播「待机变体」。
+     kind 粗分类：idle / short-idle / wait / repeat / touch / wedding / shake / entrance / broken / other */
+  const classifyMotion = (name) => {
+    const base = String(name || '').toLowerCase();
+    if (base === 'daiji_idle_01.motion3.json') return 'idle';
+    if (base.indexOf('daiji_idle_01_short') === 0) return 'short-idle';
+    if (/^wait_\d+/.test(base)) return 'wait';
+    if (/^touch_\d+/.test(base)) return 'touch';
+    if (/^broken_\d+/.test(base)) return 'broken';
+    if (base.indexOf('login') === 0) return 'entrance';
+    if (base.indexOf('wedding') === 0) return 'wedding';
+    if (base.indexOf('shake') === 0) return 'shake';
+    if (base.indexOf('repeat') === 0) return 'repeat';
+    return 'other';
+  };
+  const library = (model.motions || []).map((name) => {
+    const info = readMeta(name);
+    const found = findMotion(name);
+    return {
+      name,
+      kind: classifyMotion(name),
+      group: found ? found.group : '',
+      index: found ? found.index : -1,
+      duration: info && Number.isFinite(info.Duration) ? Number(info.Duration) : null,
+      loop: Boolean(info && info.Loop === true),
+    };
+  }).filter((item) => item.index >= 0);
   live2dAssets[model.id] = {
     settings,
     moc3: toBase64(model.moc3),
     textures: (model.textures || []).map(toBase64),
     motion: toBase64(model.motion),
     motions,
+    library,
     entrance: findMotion(model.entranceName),
     idle: findMotion(model.idleName) || findMotion('daiji_idle_01.motion3.json') || { group: '', index: 0 },
     idleDuration: idleMeta && Number.isFinite(idleMeta.Duration) ? idleMeta.Duration : 8,

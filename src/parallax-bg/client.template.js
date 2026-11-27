@@ -336,7 +336,8 @@ const THEME_DEFAULTS = {
           : Math.round(themeNumber(press.brightness !== undefined ? press.brightness : press.strength, 0, 200, 100)),
         radius: Math.round(themeNumber(press.radius, 40, 600, 108)),
       };
-      /* 2.7.1：每层一份「鼠标视差」开关 + 强度（百分比，100 = 该层的原始位移） */
+      /* 2.7.1：每层一份「鼠标视差」开关 + 强度（百分比，100 = 该层的原始位移）
+         2.8.1：组件层和 LOGO 层同一套数值（基准 18px、0–200%），位移量一致 */
       const parallax = themeGroup(raw, 'parallax');
       const parallaxLayer = (name) => {
         const source = parallax[name] && typeof parallax[name] === 'object' ? parallax[name] : {};
@@ -2029,6 +2030,61 @@ const THEME_DEFAULTS = {
         /* 2.3.1：一次瞟一眼最多带一个微表情 */
         face: { active: false, model: null, id: '', start: 0, dur: 0, attack: 0, release: 0, side: 'L', dir: 1 },
         faceLastId: '',
+        /* 2.8.1：待机变体的播放状态（一次只播一条，播完由 motionFinish 回待机） */
+        variantName: '',
+        variantUntil: 0,
+      };
+
+      /* 2.8.1：待机变体（wait_* / daiji_idle_01_short / repeat）。
+         它们和微表情共用同一个「偷瞄」节奏：每次瞟一眼时随机挑一个，
+         播一遍就回待机；偷瞄的眼/头偏移照常叠在上面，所以两件事不互相抢。 */
+      const IDLE_VARIANT_KINDS = ['wait', 'short-idle', 'repeat'];
+      const idleVariantsOf = (build) => (((build || {}).library) || [])
+        .filter((item) => IDLE_VARIANT_KINDS.indexOf(item.kind) >= 0
+          && Number.isFinite(item.index) && item.index >= 0);
+      const variantShortLabel = (name) => {
+        const base = String(name || '').toLowerCase();
+        const wait = /^wait_(\d+)/.exec(base);
+        if (wait) return 'W' + wait[1];
+        if (base.indexOf('short') >= 0) return 'S';
+        if (base.indexOf('repeat') >= 0) return 'RP';
+        return base.replace(/\.motion3\.json$/, '').slice(0, 3).toUpperCase();
+      };
+      /* 给本体（cyan-theme）用的动作口：
+         list()  = 当前模型的待机变体（调试条用；超级菜单不用它）
+         all()   = 当前模型的全部动作（超级菜单「动作」母格用，kind 交给本体过滤待机变体）
+         play()  = 播任意一条动作（FORCE 优先级，播完由 motionFinish 回待机） */
+      window.__DSH_EXV_LIVE2D_MOTIONS__ = {
+        list: () => {
+          const id = live2d.currentId || live2d.targetId;
+          return idleVariantsOf(LIVE2D_ASSETS[id]).map((item) => ({
+            name: item.name,
+            short: variantShortLabel(item.name),
+            duration: item.duration,
+          }));
+        },
+        all: () => {
+          const id = live2d.currentId || live2d.targetId;
+          /* 注意：这些模型的动作全在「空字符串」这个 motion group 里（FileReferences.Motions 的
+             键就是 ""），所以不能按 group 非空过滤，否则整张表会被清空——第一版就栽在这。 */
+          return (((LIVE2D_ASSETS[id] || {}).library) || [])
+            .filter((item) => Number.isFinite(item.index) && item.index >= 0)
+            .map((item) => ({
+              name: item.name,
+              kind: item.kind,
+              group: item.group,
+              index: item.index,
+              duration: item.duration,
+              loop: item.loop === true,
+            }));
+        },
+        play: (name) => {
+          const model = live2d.model;
+          if (!model) return Promise.resolve({ ok: false, reason: '模型还没就绪' });
+          if (typeof model.__dshPlayMotion === 'function') return model.__dshPlayMotion(name);
+          if (typeof model.__dshPlayVariant === 'function') return model.__dshPlayVariant(name);
+          return Promise.resolve({ ok: false, reason: '模型还没就绪' });
+        },
       };
 
       /* Rewrite all file references to data URLs so the model loads without
@@ -2227,7 +2283,24 @@ const THEME_DEFAULTS = {
           glance.dur = 2400 + Math.random() * 2400;
           glance.x = (Math.random() * 2 - 1) * 0.12;
           glance.y = (Math.random() * 2 - 1) * 0.08;
-          startGlanceFace(model, now, expressionEnabled);
+          /* 2.8.1：待机变体和微表情共用一个池子——这一眼随机挑一个：
+             要么一个微表情，要么播一条待机变体（变体播放期间偷瞄照样叠加）。
+             模型没有微表情时（例如 VECTOR 1901），变体就是池子里唯一的选项。 */
+          const variantPool = expressionEnabled ? (model.__dshIdleVariants || []) : [];
+          const facePool = model.__dshFacePool || [];
+          const variantFree = performance.now() >= (live2d.variantUntil || 0) && !live2d.entrancePending;
+          const useVariant = variantPool.length > 0 && variantFree
+            && (facePool.length === 0 || Math.random() < 0.45);
+          if (useVariant) {
+            const picked = variantPool[Math.floor(Math.random() * variantPool.length)].name;
+            window.setTimeout(() => {
+              if (live2d.model === model && typeof model.__dshPlayVariant === 'function') {
+                model.__dshPlayVariant(picked);
+              }
+            }, 0);
+          } else {
+            startGlanceFace(model, now, expressionEnabled);
+          }
         } else if (!expressionEnabled && live2d.face.active) {
           clearGlanceFace();
         }
@@ -2293,6 +2366,62 @@ const THEME_DEFAULTS = {
          different model's offsets when they become current again. */
       const prepareLive2DModel = (id, model, build) => {
         const entry = { id, model, build, manager: null, startIdle: null, playEntrance: null };
+        const variants = idleVariantsOf(build);
+        entry.variants = variants;
+        /* 2.9.0：这个模型的全部动作（含待机 / 入场 / 互动 / 婚纱 / 摇晃 / 故障 / 其他），
+           超级菜单「动作」母格用；kind 由本体决定要不要过滤掉待机变体。
+           这些模型的动作都在空字符串 motion group 里，不能按 group 非空过滤。 */
+        const allMotions = (((build || {}).library) || [])
+          .filter((item) => Number.isFinite(item.index) && item.index >= 0);
+        entry.allMotions = allMotions;
+        /* 2.9.0：一次性动作（手动播的动作 / 待机变体 / 入场）播完，模型不会自己回默认——
+           动作里改过、而 idle 不驱动的参数会一直留着。vv 报的两个现象就是它：
+           HK416 3401N 的 touch_4 播完一直保持「拉近」，另有一条动作让瞳孔一直很小、嘴合不拢。
+           做法：动作结束那一刻记下所有偏离默认值的参数，之后 260ms 里从当时的数值 ease-out 回默认值。
+           写在 motion 更新之前，idle 自己会覆盖它驱动的那些参数，只有没人管的残留才会被抹掉。 */
+        const settle = { active: false, start: 0, duration: 450, indices: [], from: [], to: [] };
+        const beginSettle = () => {
+          try {
+            const coreModel = model.internalModel.coreModel;
+            const count = coreModel.getParameterCount();
+            const indices = [];
+            const from = [];
+            const to = [];
+            for (let index = 0; index < count; index += 1) {
+              const value = coreModel.getParameterValueByIndex(index);
+              const base = coreModel.getParameterDefaultValue(index);
+              if (Math.abs(value - base) > 0.0005) {
+                indices.push(index);
+                from.push(value);
+                to.push(base);
+              }
+            }
+            if (indices.length === 0) {
+              settle.active = false;
+              return;
+            }
+            settle.active = true;
+            settle.start = performance.now();
+            settle.indices = indices;
+            settle.from = from;
+            settle.to = to;
+          } catch (error) {
+            settle.active = false;
+          }
+        };
+        const applySettle = () => {
+          if (!settle.active) return;
+          const progress = Math.min(1, (performance.now() - settle.start) / settle.duration);
+          if (progress >= 1) settle.active = false;
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const coreModel = model.internalModel.coreModel;
+          for (let index = 0; index < settle.indices.length; index += 1) {
+            const value = settle.from[index] + (settle.to[index] - settle.from[index]) * eased;
+            try { coreModel.setParameterValueByIndex(settle.indices[index], value); } catch (error) { /* ignore */ }
+          }
+        };
+        entry.beginSettle = beginSettle;
+        entry.cancelSettle = () => { settle.active = false; };
         const manager = model.internalModel.motionManager;
         if (!manager) return entry;
         const core = model.internalModel.coreModel;
@@ -2307,19 +2436,28 @@ const THEME_DEFAULTS = {
             try { core.setParameterValueById(param, core.getParameterValueById(param) - value); } catch (error) { /* parameter absent */ }
           }
           for (const key of Object.keys(offsets)) delete offsets[key];
+          applySettle();
           originalMotionUpdate(...args);
           applyEyeAndHead(model);
         };
         entry.manager = manager;
 
         const startIdle = () => {
+          if (live2d.model === model) {
+            live2d.variantName = '';
+            live2d.variantUntil = 0;
+          }
           if (live2d.model !== model || live2d.idleStarting) return;
           window.clearTimeout(live2d.idleTimer);
           const prepareIdleMotion = (motion) => {
             if (!motion) return;
             if (motion.setIsLoop) motion.setIsLoop(true);
             if (motion.setIsLoopFadeIn) motion.setIsLoopFadeIn(false);
-            if (motion.setFadeInTime) motion.setFadeInTime(0);
+            /* 2.9.0：回待机的淡入。以前这里是 0——动作一结束，idle 第一帧就把参数瞬间拉过去，
+               vv 说的「瞬移」就是它。框架的淡入是 sine ease-in-out（getEasingSine），而且只作用于
+               「开始播放」这一下：循环边界仍由 setIsLoopFadeIn(false) 关着，不会重新出现顿挫。
+               0.45s 是 vv 定的（比 0.3 更绵、不显生硬）。 */
+            if (motion.setFadeInTime) motion.setFadeInTime(0.45);
             if (motion.setFadeOutTime) motion.setFadeOutTime(0);
           };
           const beginIdle = (motion) => {
@@ -2329,7 +2467,15 @@ const THEME_DEFAULTS = {
             }
             prepareIdleMotion(motion);
             const started = manager.startMotion(build.idle.group, build.idle.index, 2);
-            Promise.resolve(started).finally(() => {
+            Promise.resolve(started).then((ok) => {
+              if (ok === true || live2d.model !== model) return;
+              /* 待机被队列拒掉（优先级还没复位 / 同一帧里刚结束一条动作）时补一次，
+                 否则会停在最后一个姿势上等到下一次 checkIdle。 */
+              window.setTimeout(() => {
+                if (live2d.model === model && !live2d.idleStarting
+                  && manager.isFinished && manager.isFinished()) startIdle();
+              }, 120);
+            }).finally(() => {
               if (live2d.model === model) live2d.idleStarting = false;
             });
           };
@@ -2358,7 +2504,18 @@ const THEME_DEFAULTS = {
           live2d.idleTimer = window.setTimeout(checkIdle, idleSeconds * 1000);
         };
         manager.on('motionFinish', () => {
-          if (live2d.model === model) startIdle();
+          if (live2d.model !== model) return;
+          /* 2.9.0：动作刚播完的这一帧，参数还是它最后一帧的值——就在这里记下来，
+             后面 450ms 内抹回默认值，否则 idle 不驱动的那些参数会一直挂着。
+             450ms 和回待机的淡入（prepareIdleMotion 里的 0.45）对齐，两段过渡同相。 */
+          beginSettle();
+          /* 这个事件是在 manager.update() 里、state.complete() 之前同步发出的：
+             此刻 currentPriority 还是刚播完那条动作的优先级，直接 startIdle 会被
+             Cubism4MotionState.reserve() 拒掉（入场刚播完也会卡在这里）。
+             推到下一轮宏任务，等优先级复位再开待机。 */
+          window.setTimeout(() => {
+            if (live2d.model === model) startIdle();
+          }, 0);
         });
         entry.startIdle = startIdle;
         entry.playEntrance = () => {
@@ -2391,6 +2548,74 @@ const THEME_DEFAULTS = {
             startIdle();
           }
         };
+        /* 2.8.1：播一条待机变体——走和入场同一条路（一次性播放，播完 motionFinish 回待机），
+           只是淡入保留默认值，和待机之间的过渡柔和一点。
+           优先级必须是 FORCE(3)：待机是用 NORMAL(2) 循环播的，同优先级的请求会被
+           Cubism4MotionState.reserve() 直接拒掉（这就是第一版点了没反应的原因）。 */
+        const playSpec = (spec) => new Promise((resolve) => {
+          if (live2d.model !== model || live2d.entrancePending) {
+            resolve({ ok: false, reason: '还没就绪（入场中）' });
+            return;
+          }
+          /* 新动作要接手参数：上一轮「抹回默认值」的过渡立刻作废，不然会和它抢 */
+          settle.active = false;
+          window.clearTimeout(live2d.idleTimer);
+          live2d.idleTimer = 0;
+          const begin = (motion) => {
+            if (!motion || live2d.model !== model) {
+              resolve({ ok: false, reason: '动作没加载起来' });
+              return;
+            }
+            if (motion.setIsLoop) motion.setIsLoop(false);
+            if (motion.setIsLoopFadeIn) motion.setIsLoopFadeIn(false);
+            if (motion.setFadeOutTime) motion.setFadeOutTime(0);
+            live2d.variantName = spec.name;
+            live2d.variantUntil = performance.now() + (Number(spec.duration) || 5) * 1000;
+            let started = null;
+            try {
+              started = manager.startMotion(spec.group, spec.index, 3);
+            } catch (error) {
+              started = Promise.resolve(false);
+            }
+            Promise.resolve(started).then((ok) => {
+              if (ok === true) {
+                resolve({ ok: true, reason: '' });
+                return;
+              }
+              if (live2d.model === model) startIdle();
+              resolve({ ok: false, reason: '被动作队列拒绝（优先级/正在播同一条）' });
+            }, () => {
+              if (live2d.model === model) startIdle();
+              resolve({ ok: false, reason: '动作队列报错' });
+            });
+          };
+          const loaded = manager.motionGroups
+            && manager.motionGroups[spec.group]
+            && manager.motionGroups[spec.group][spec.index];
+          if (loaded) begin(loaded);
+          else {
+            Promise.resolve(manager.loadMotion(spec.group, spec.index))
+              .then(begin)
+              .catch(() => {
+                if (live2d.model === model) startIdle();
+                resolve({ ok: false, reason: '动作加载失败' });
+              });
+          }
+        });
+        entry.playVariant = (name) => {
+          const spec = variants.find((item) => item.name === name);
+          if (!spec) return Promise.resolve({ ok: false, reason: '这个模型没有这条动作' });
+          return playSpec(spec);
+        };
+        /* 2.9.0：超级菜单「动作」母格——播当前模型的任意一条动作（原始动画名） */
+        entry.playMotion = (name) => {
+          const spec = allMotions.find((item) => item.name === name);
+          if (!spec) return Promise.resolve({ ok: false, reason: '这个模型没有这条动作' });
+          return playSpec(spec);
+        };
+        model.__dshIdleVariants = variants;
+        model.__dshPlayVariant = entry.playVariant;
+        model.__dshPlayMotion = entry.playMotion;
         return entry;
       };
 
@@ -2476,6 +2701,8 @@ const THEME_DEFAULTS = {
         live2d.idleTimer = 0;
         live2d.entrancePending = false;
         live2d.idleStarting = false;
+        live2d.variantName = '';
+        live2d.variantUntil = 0;
         live2d.model = entry.model;
         live2d.currentEntry = entry;
         live2d.currentId = id;
@@ -2483,6 +2710,9 @@ const THEME_DEFAULTS = {
         live2d.manager = entry.manager;
         live2d.startIdle = entry.startIdle;
         live2d.playEntrance = entry.playEntrance;
+        live2d.playVariant = entry.playVariant;
+        /* 换了模型：本体那边的动作按钮（调试条 / 以后的超级菜单）要跟着刷新列表 */
+        try { window.dispatchEvent(new CustomEvent('dsh-exv-live2d-motions')); } catch (error) { /* ignore */ }
         if (entry.model.parent !== live2d.app.stage) live2d.app.stage.addChild(entry.model);
         rememberLive2DEntry(id, entry);
         trimLive2DCache();

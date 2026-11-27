@@ -506,7 +506,8 @@ const THEME_DEFAULTS = {
           : Math.round(themeNumber(press.brightness !== undefined ? press.brightness : press.strength, 0, 200, 100)),
         radius: Math.round(themeNumber(press.radius, 40, 600, 108)),
       };
-      /* 2.7.1：每层一份「鼠标视差」开关 + 强度（百分比，100 = 该层的原始位移） */
+      /* 2.7.1：每层一份「鼠标视差」开关 + 强度（百分比，100 = 该层的原始位移）
+         2.8.1：组件层和 LOGO 层用同一套数值（基准 18px、0–200%），位移量完全一致。 */
       const parallax = themeGroup(raw, 'parallax');
       const parallaxLayer = (name) => {
         const source = parallax[name] && typeof parallax[name] === 'object' ? parallax[name] : {};
@@ -1510,6 +1511,31 @@ const VV_OPTIONS = [
       { id: 'm200', label: 'M200', group: '静态', thumb: THUMB_M200, fit: 'cover' },
       { id: 'ak74m', label: 'AK74M', group: '静态', thumb: THUMB_AK74M, fit: 'cover' },
     ];
+    /* 卡片文件夹：只负责在背景菜单里把同类卡片分组展示，不改变任何配置结构——
+       选中仍然是组里那张卡自己的 id，卡片数据一份不动，也没有额外的存储字段。 */
+    const CARD_FOLDERS = {
+      background: [{ id: 'rocket', label: 'Rocket Launch', ids: ['cz5', 'deltaheavy', 'spacex', 'spacexr'] }],
+      logo: [{ id: 'exv-origin', label: 'EXV Origin', ids: ['default', 'mark', 'text'] }],
+      live2d: [
+        { id: 'ar15', label: 'AR15', ids: ['ar15_4508', 'ar15mod_n'] },
+        { id: 'hk416', label: 'HK416', ids: ['hk416_3401_n', 'hk416_3401_d', 'hk416_805', 'hk416mod_n'] },
+        { id: 'm4-sopmod-ii', label: 'M4 SOPMOD II', ids: ['m4_sopmod_ii_4507_n', 'm4_sopmod_ii_4507_d', 'm4_sopmod_iimod'] },
+        { id: 'ro635', label: 'RO635', ids: ['ro635_4504', 'ro635mod'] },
+        { id: 'vector', label: 'VECTOR', ids: ['vector_1901', 'vector_6701_n'] },
+      ],
+    };
+    /* 文件夹卡片复用同一份卡片数据（label / 缩略图），根列表里去掉已经进组的卡 */
+    const splitCardFolders = (options, defs) => {
+      const used = new Set();
+      const folders = (defs || []).map((def) => {
+        const kids = def.ids
+          .map((id) => options.find((option) => option.id === id))
+          .filter(Boolean);
+        kids.forEach((kid) => used.add(kid.id));
+        return { id: def.id, label: def.label, options: kids };
+      }).filter((entry) => entry.options.length > 0);
+      return { folders, rest: options.filter((option) => !used.has(option.id)) };
+    };
     const MODE_OPTIONS = [
       { id: 'none', label: '关闭' },
       { id: 'static', label: '静态' },
@@ -2051,6 +2077,63 @@ const VV_OPTIONS = [
       /* 「按钮自动缩回」关掉：打开模式后保持展开（旧行为），要不要挡住下面由使用者决定 */
       '.dsh-tools[data-autoretract="0"] .dsh-tool[data-active] { width: 138px; }',
       '.dsh-tools[data-autoretract="0"] .dsh-tool[data-active] .dsh-tool-label { opacity: 1; transform: translateY(0); }',
+      /* 2.9.0：待机变体的调试按钮已经在发布前删掉（它们只是为了让调试时能单独点播变体） */
+      /* ==== 2.9.0 超级全局菜单（原型）：70% 黑蒙版 + 中心方框 + 8 个母格 + 图层子格 ==== */
+      '.dsh-super-overlay { position: fixed; inset: 0; z-index: 2147482950; visibility: hidden; pointer-events: none; }',
+      '.dsh-super-overlay[data-state="in"] { visibility: visible; pointer-events: auto; }',
+      '.dsh-super-overlay[data-state="out"] { visibility: visible; pointer-events: none; }',
+      /* 蒙版单独一层做 opacity：比直接过渡 background-color 少一次整屏重绘，不会闪 */
+      '.dsh-super-dim { position: absolute; inset: 0; background: #000; opacity: 0; will-change: opacity; transition: opacity .2s ease; }',
+      '.dsh-super-overlay[data-state="in"] .dsh-super-dim { opacity: 0.70; }',
+      '.dsh-super-overlay[data-state="out"] .dsh-super-dim { opacity: 0; transition-duration: .16s; }',
+      /* 中心格：平时和未选中的 5~8 占位格同款（暗底 + 55% 描边），
+         指针停在它上面时才亮成 1~4 那种加亮框——鼠标移到别的母格后它就「恢复原样」。 */
+      '.dsh-super-frame { position: absolute; box-sizing: border-box; border: 2px solid rgba(var(--dsh-accent-rgb), 0.55); background: rgba(0, 0, 0, 0.35); opacity: 0; transform: scale(.92); transition: opacity .15s ease, transform .15s ease, border-color .1s ease, box-shadow .1s ease; }',
+      '.dsh-super-overlay[data-state="in"] .dsh-super-frame { opacity: 1; transform: scale(1); }',
+      '.dsh-super-overlay[data-state="in"] .dsh-super-frame:hover { border-color: var(--dsh-accent); box-shadow: 0 0 26px rgba(var(--dsh-accent-rgb), 0.45); }',
+      '.dsh-super-overlay[data-state="out"] .dsh-super-frame { opacity: 0; transform: scale(.94); }',
+      '.dsh-super-cell { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 2px solid rgba(var(--dsh-accent-rgb), 0.55); background: rgba(0, 0, 0, 0.35); color: var(--dsh-accent-text) !important; opacity: 0; transform: translate(0, 0); pointer-events: none; transition: opacity .12s ease, transform .14s ease; }',
+      /* 1~4 才是真母格：未选中态用原来中心格那种加亮框；对角 5~8 保持 55% */
+      '.dsh-super-cell:not([data-diag]) { border-color: var(--dsh-accent); }',
+      /* 铺开动画期间不接收悬停：先等 1~4 落地（300ms），5~8 铺完（620ms）再放开剩余的 */
+      '.dsh-super-overlay[data-ready="1"] .dsh-super-cell:not([data-diag]) { pointer-events: auto; }',
+      '.dsh-super-overlay[data-ready="2"] .dsh-super-cell { pointer-events: auto; }',
+      '.dsh-super-overlay[data-state="in"] .dsh-super-cell { animation: dsh-super-cell-in .12s cubic-bezier(.25,.9,.3,1) both; }',
+      '.dsh-super-overlay[data-state="out"] .dsh-super-cell { animation: dsh-super-cell-out .1s ease both; }',
+      '.dsh-super-toast { position: fixed; left: 50%; bottom: 92px; z-index: 2147483600; padding: 9px 18px; background: rgba(0, 0, 0, 0.88); border: 1px solid rgba(var(--dsh-accent-rgb), 0.7); color: var(--dsh-accent-text); font-size: 12px; letter-spacing: 0.08em; box-shadow: 0 0 22px rgba(var(--dsh-accent-rgb), 0.35); opacity: 0; transform: translate(-50%, 8px); transition: opacity .18s ease, transform .18s ease; pointer-events: none; }',
+      '.dsh-super-toast[data-in] { opacity: 1; transform: translate(-50%, 0); }',
+      '.dsh-super-toast[data-bad] { border-color: rgba(255, 59, 48, 0.8); color: #ff6a5c; box-shadow: 0 0 22px rgba(255, 59, 48, 0.3); }',
+      '.dsh-super-cell-icon { display: flex; align-items: center; justify-content: center; opacity: 0.95; }',
+      '.dsh-super-cell-label { font-size: 10px; letter-spacing: 0.08em; text-indent: 0.08em; opacity: 0.82; white-space: nowrap; }',
+      /* 不可用的母格：警戒线填充。悬浮照样整块高亮（下面那条 :hover 在它后面，会盖掉条纹）。 */
+      '.dsh-super-cell[data-off] { background: repeating-linear-gradient(45deg, rgba(var(--dsh-accent-rgb), 0.34) 0 8px, rgba(var(--dsh-accent-rgb), 0.05) 8px 16px); }',
+      /* 悬停 = 整块实心主色填充（不透明、高对比），颜色不带过渡，瞬间切换 */
+      '.dsh-super-cell:hover, .dsh-super-cell[data-forced] { border-color: var(--dsh-accent); background: var(--dsh-accent); color: var(--dsh-accent-ink) !important; box-shadow: 0 0 26px rgba(var(--dsh-accent-rgb), 0.55); }',
+      '.dsh-super-cell:hover .dsh-super-cell-label, .dsh-super-cell[data-forced] .dsh-super-cell-label { opacity: 1; }',
+      /* 图层子格整条：一条「悬停区」盖住所有子格和它们之间的缝隙 */
+      '.dsh-super-layers { position: absolute; pointer-events: none; }',
+      '.dsh-super-layers[data-open] { pointer-events: auto; }',
+      /* 图层子格：母格横切成两半的长方形，从母格里沿母格方向滑出；开关是右侧的小方块 */
+      '.dsh-super-layer { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 8px; border: 1px solid rgba(var(--dsh-accent-rgb), 0.55); background: rgba(0, 0, 0, 0.45); color: var(--dsh-accent-text) !important; font-size: 11px; letter-spacing: 0.06em; opacity: 0; transform: translate(0, var(--ly, 0px)); pointer-events: none; transition: opacity .1s ease, transform .13s ease; }',
+      '.dsh-super-layer[data-open] { opacity: 1; transform: translate(0, 0); pointer-events: auto; }',
+      '.dsh-super-layer-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+      /* 「动作」条右侧的分类小字（待机 / 入场 / 互动 / 婚纱 / 摇晃 / 故障 / 其他） */
+      '.dsh-super-layer-tag { flex: none; font-size: 10px; letter-spacing: 0.05em; opacity: 0.55; }',
+      '.dsh-super-layer:hover .dsh-super-layer-tag { opacity: 0.8; }',
+      '.dsh-super-layer-sw { flex: none; width: 14px; height: 14px; box-sizing: border-box; border: 1px solid rgba(var(--dsh-accent-rgb), 0.70); background: transparent; transition: background-color .1s ease, border-color .1s ease; }',
+      '.dsh-super-layer-sw[data-on] { background: var(--dsh-accent); border-color: var(--dsh-accent); }',
+      '.dsh-super-layer:hover { border-color: var(--dsh-accent); background: var(--dsh-accent); color: var(--dsh-accent-ink) !important; }',
+      '.dsh-super-layer:hover .dsh-super-layer-sw { border-color: var(--dsh-accent-ink); }',
+      '.dsh-super-layer:hover .dsh-super-layer-sw[data-on] { background: var(--dsh-accent-ink); }',
+      /* 二级方格行：贴着一级条右侧，从条里滑出来；单选，选中 = 实心主色 */
+      '.dsh-super-modes { position: absolute; pointer-events: none; }',
+      '.dsh-super-modes[data-open] { pointer-events: auto; }',
+      '.dsh-super-square { position: absolute; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(var(--dsh-accent-rgb), 0.55); background: rgba(0, 0, 0, 0.45); color: var(--dsh-accent-text) !important; font-size: 11px; letter-spacing: 0.04em; opacity: 0; transform: translate(var(--lx, 0px), 0); pointer-events: none; transition: opacity .1s ease, transform .13s ease; }',
+      '.dsh-super-square[data-open] { opacity: 1; transform: translate(0, 0); pointer-events: auto; }',
+      '.dsh-super-square[data-on] { border-color: var(--dsh-accent); background: var(--dsh-accent); color: var(--dsh-accent-ink) !important; }',
+      '.dsh-super-square:hover { border-color: var(--dsh-accent); background: var(--dsh-accent); color: var(--dsh-accent-ink) !important; box-shadow: 0 0 18px rgba(var(--dsh-accent-rgb), 0.45); }',
+      '@keyframes dsh-super-cell-in { from { opacity: 0; transform: translate(var(--fx, 0px), var(--fy, 0px)); } to { opacity: 1; transform: translate(var(--dx), var(--dy)); } }',
+      '@keyframes dsh-super-cell-out { from { opacity: 1; transform: translate(var(--dx), var(--dy)); } to { opacity: 0; transform: translate(0, 0); } }',
       /* Background editor: settings-style glass sheet. */
       '.dsh-bg-overlay { position: fixed; inset: 0; z-index: 2147482000; pointer-events: none; background: transparent; }',
       '.dsh-bg-panel { position: fixed; pointer-events: auto; box-sizing: border-box; display: flex; flex-direction: column; width: min(1160px, calc(100vw - 80px)); height: min(760px, calc(100vh - 80px)); padding: 18px 20px 16px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(var(--dsh-accent-rgb), 0.55); box-shadow: 0 0 32px rgba(var(--dsh-accent-rgb), 0.18); backdrop-filter: blur(20px) saturate(1.15); -webkit-backdrop-filter: blur(20px) saturate(1.15); color: var(--dsh-accent-text); }',
@@ -2277,6 +2360,79 @@ const VV_OPTIONS = [
       '.dsh-bg-tree-caret { width: 13px; height: 13px; min-width: 13px; flex: none; opacity: 0.8; transition: transform .12s ease; }',
       '.dsh-bg-tree-icon { display: flex; align-items: center; justify-content: center; width: 13px; height: 13px; flex: none; opacity: 0.85; }',
       '.dsh-bg-tree-icon svg { display: block; }',
+      /* 全局菜单图标：战地 2042 那个加载动画的简化版（GIF 304 帧 / 20ms 实测，
+         一个循环 80 帧 = 1.6s）。四拍：十字（带方孔）→ 收拢成实心方块 → 弹开 →
+         整组转 45° 成菱形「×」→ 再转回十字。故障 / 错位那一下按 vv 的意思不做。 */
+      '.dsh-menu-spin { transform-box: fill-box; transform-origin: center; animation: dsh-menu-spin 1.6s linear infinite; }',
+      '@keyframes dsh-menu-spin { 0%, 18% { transform: rotate(0deg); } 30%, 44% { transform: rotate(0deg); } 58%, 74% { transform: rotate(45deg); } 88%, 100% { transform: rotate(90deg); } }',
+      '.dsh-menu-arm { animation: dsh-menu-arm 1.6s linear infinite; }',
+      '@keyframes dsh-menu-arm { 0%, 18% { transform: translate(0, 0); } 30%, 44% { transform: translate(var(--mx), var(--my)); } 58%, 100% { transform: translate(0, 0); } }',
+      /* 故障那一拍：GIF 里大致每圈末尾都会抽一下，这里给 1~2 帧的横向错位 + 斜切 + 掉一点不透明度 */
+      '.dsh-menu-glitch { transform-box: fill-box; transform-origin: center; animation: dsh-menu-glitch 1.6s linear infinite; }',
+      '@keyframes dsh-menu-glitch { 0%, 82% { transform: none; opacity: 1; } 83.5% { transform: translate(-0.9px, 0.35px) skewX(-11deg); opacity: 0.7; } 85% { transform: translate(1px, -0.3px) skewX(9deg); opacity: 1; } 86.5% { transform: translate(-0.5px, 0) skewX(-3deg); opacity: 0.85; } 88%, 100% { transform: none; opacity: 1; } }',
+      /* 树的第 7 个根换成「增强包选择框上面那颗独立按钮」：图标收在按钮里，
+         悬停或打开这一页时快速滑出；打开时按钮整块青底 + 反色字（和树里常规选中一致）。 */
+      '.dsh-menu-entry { display: flex; align-items: center; flex: none; height: 34px; margin: 0 8px 8px; padding: 0 10px; box-sizing: border-box; border: 1px solid rgba(var(--dsh-accent-rgb), 0.55); color: rgba(var(--dsh-accent-text-rgb), 0.72); font-size: 12px; letter-spacing: 0.18em; cursor: pointer; user-select: none; overflow: hidden; transition: background .14s ease, color .14s ease, border-color .14s ease; }',
+      '.dsh-menu-entry:hover { background: rgba(var(--dsh-accent-rgb), 0.10); color: var(--dsh-accent-text); }',
+      '.dsh-menu-entry[data-active] { background: var(--dsh-accent); border-color: var(--dsh-accent-text); color: var(--dsh-accent-ink) !important; }',
+      '.dsh-menu-entry-icon { display: flex; align-items: center; justify-content: center; width: 0; opacity: 0; transform: translateX(-14px); overflow: hidden; transition: width .18s cubic-bezier(.22, .8, .24, 1), opacity .12s linear, transform .18s cubic-bezier(.22, .8, .24, 1); }',
+      '.dsh-menu-entry:hover .dsh-menu-entry-icon, .dsh-menu-entry[data-active] .dsh-menu-entry-icon { width: 30px; opacity: 1; transform: none; }',
+      '.dsh-menu-entry-icon svg { display: block; }',
+      '.dsh-menu-entry-label { flex: 1 1 auto; white-space: nowrap; }',
+      /* ---- 全局菜单设置页（2.9.0）：九宫格摆位 + 功能池 ---- */
+      '.dsh-sm-note { margin: 2px 0 10px; color: rgba(var(--dsh-accent-text-rgb), 0.45); font-size: 11px; line-height: 1.7; }',
+      '.dsh-sm-grid { display: grid; grid-template-columns: repeat(3, 82px); grid-auto-rows: 82px; gap: 8px; justify-content: center; margin: 6px 0 2px; }',
+      '.dsh-sm-cell { position: relative; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid rgba(var(--dsh-accent-rgb), 0.55); background: rgba(var(--dsh-accent-rgb), 0.04); user-select: none; }',
+      '.dsh-sm-cell[data-cardinal] { border-color: var(--dsh-accent); box-shadow: inset 0 0 10px rgba(var(--dsh-accent-rgb), 0.16); }',
+      '.dsh-sm-cell[data-empty] { border: 0; background: transparent; }',
+      '.dsh-sm-cell[data-center] { border: 1px solid rgba(var(--dsh-accent-rgb), 0.35); background: rgba(var(--dsh-accent-rgb), 0.02); cursor: default; }',
+      '.dsh-sm-cell[data-filled] { cursor: grab; }',
+      '.dsh-sm-cell[data-filled]:hover { background: rgba(var(--dsh-accent-rgb), 0.12); }',
+      '.dsh-sm-cell[data-muted] { opacity: 0.32; }',
+      '.dsh-sm-cell[data-drop] { border-color: var(--dsh-accent-text); background: var(--dsh-accent); box-shadow: 0 0 18px rgba(var(--dsh-accent-rgb), 0.55); }',
+      '.dsh-sm-cell[data-drop] .dsh-sm-name, .dsh-sm-cell[data-drop] .dsh-sm-num, .dsh-sm-cell[data-drop] .dsh-sm-plus { color: var(--dsh-accent-ink) !important; }',
+      '.dsh-sm-cell[data-drop] .dsh-sm-ants rect { stroke: var(--dsh-accent-ink); }',
+      '.dsh-sm-cell[data-bad] { border-color: rgba(255, 59, 48, 0.8); background: rgba(255, 59, 48, 0.10); }',
+      '.dsh-sm-ants { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }',
+      '.dsh-sm-ants rect { fill: none; stroke: rgba(var(--dsh-accent-rgb), 0.55); stroke-width: 1.5; stroke-dasharray: 5 5; animation: dsh-sm-ants 1.1s linear infinite; }',
+      '@keyframes dsh-sm-ants { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -20; } }',
+      '.dsh-sm-plus { color: rgba(var(--dsh-accent-text-rgb), 0.42); font-size: 19px; font-weight: 300; line-height: 1; }',
+      '.dsh-sm-num { position: absolute; left: 5px; top: 3px; font-size: 10px; letter-spacing: 0.06em; color: rgba(var(--dsh-accent-text-rgb), 0.45); }',
+      '.dsh-sm-name { padding: 0 4px; text-align: center; font-size: 12px; letter-spacing: 0.06em; color: var(--dsh-accent-text); }',
+      '.dsh-sm-frame { width: 34px; height: 34px; box-sizing: border-box; border: 2px solid var(--dsh-accent); background: rgba(var(--dsh-accent-rgb), 0.06); }',
+      '.dsh-sm-pool { display: flex; flex-wrap: wrap; gap: 8px; min-height: 86px; box-sizing: border-box; padding: 9px; border: 1px dashed rgba(var(--dsh-accent-rgb), 0.28); background: rgba(var(--dsh-accent-rgb), 0.03); }',
+      '.dsh-sm-pool[data-drop] { border-color: var(--dsh-accent); background: rgba(var(--dsh-accent-rgb), 0.10); }',
+      '.dsh-sm-pool-empty { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 64px; padding: 0 12px; text-align: center; color: rgba(var(--dsh-accent-text-rgb), 0.35); font-size: 11px; line-height: 1.7; }',
+      '.dsh-sm-chip { width: 78px; height: 78px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 2px solid rgba(var(--dsh-accent-rgb), 0.75); background: rgba(var(--dsh-bg-base-rgb), 0.55); color: var(--dsh-accent-text); font-size: 12px; letter-spacing: 0.06em; cursor: grab; user-select: none; }',
+      '.dsh-sm-chip:hover { border-color: var(--dsh-accent-text); background: rgba(var(--dsh-accent-rgb), 0.16); }',
+      '.dsh-sm-chip-icon { display: flex; align-items: center; justify-content: center; opacity: 0.9; }',
+      '.dsh-sm-chip-label { max-width: 72px; text-align: center; font-size: 12px; letter-spacing: 0.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }',
+      '.dsh-sm-cell-icon { display: flex; align-items: center; justify-content: center; margin-bottom: 2px; opacity: 0.9; }',
+      '.dsh-sm-ghost { position: absolute; z-index: 2147482500; width: 78px; height: 78px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid var(--dsh-accent-text); background: rgba(var(--dsh-accent-rgb), 0.35); color: var(--dsh-accent-text); font-size: 12px; letter-spacing: 0.06em; pointer-events: none; transform: translate(10px, 10px); }',
+      '.dsh-sm-ghost[data-fixed] { position: fixed; }',
+      '.dsh-sm-disabled { pointer-events: none; opacity: 0.35; }',
+      '.dsh-sm-sum { color: rgba(var(--dsh-accent-text-rgb), 0.45); font-size: 11px; letter-spacing: 0.06em; }',
+      '.dsh-sm-status { margin: 2px 0 3px; color: rgba(var(--dsh-accent-text-rgb), 0.72); font-size: 11px; line-height: 1.6; }',
+      '.dsh-sm-warn { margin: 2px 0 3px; color: #ff6a5c; font-size: 11px; line-height: 1.6; }',
+      /* 功能配置：仿老式 Windows 资源管理器的树（虚线竖干 + 横枝 + 方角输入框） */
+      '.dsh-sm-tree { padding: 6px 8px 8px; border: 1px solid rgba(var(--dsh-accent-rgb), 0.28); background: rgba(var(--dsh-accent-rgb), 0.03); }',
+      '.dsh-sm-tree-root { display: flex; align-items: center; gap: 6px; height: 24px; color: var(--dsh-accent-text); font-size: 12px; letter-spacing: 0.06em; cursor: pointer; user-select: none; }',
+      '.dsh-sm-tree-root:hover { background: rgba(var(--dsh-accent-rgb), 0.10); }',
+      '.dsh-sm-caret { display: flex; align-items: center; justify-content: center; width: 10px; height: 10px; flex: none; font-size: 9px; color: rgba(var(--dsh-accent-text-rgb), 0.6); }',
+      '.dsh-sm-tree-count { margin-left: auto; font-size: 10px; letter-spacing: 0.04em; color: rgba(var(--dsh-accent-text-rgb), 0.45); }',
+      '.dsh-sm-tree-kids { margin: 2px 0 0 5px; padding-left: 14px; border-left: 1px dashed rgba(var(--dsh-accent-rgb), 0.30); }',
+      '.dsh-sm-tree-row { position: relative; display: flex; align-items: center; gap: 6px; height: 28px; }',
+      '.dsh-sm-tree-row::before { content: ""; position: absolute; left: -14px; width: 12px; height: 1px; background: rgba(var(--dsh-accent-rgb), 0.30); }',
+      '.dsh-sm-input { height: 22px; box-sizing: border-box; padding: 0 6px; background: rgba(var(--dsh-bg-base-rgb), 0.6); border: 1px solid rgba(var(--dsh-accent-rgb), 0.35); color: var(--dsh-accent-text); font-size: 11px; letter-spacing: 0.02em; outline: none; }',
+      '.dsh-sm-input:focus { border-color: var(--dsh-accent); }',
+      '.dsh-sm-input[data-bad] { border-color: rgba(255, 59, 48, 0.75); }',
+      '.dsh-sm-input-name { flex: none; width: 92px; }',
+      '.dsh-sm-input-path { flex: 1 1 auto; min-width: 0; }',
+      '.dsh-sm-row-del { flex: none; width: 22px; height: 22px; padding: 0; background: transparent; border: 1px solid rgba(var(--dsh-accent-rgb), 0.35); color: rgba(var(--dsh-accent-text-rgb), 0.7); font-size: 12px; line-height: 1; cursor: pointer; }',
+      '.dsh-sm-row-del:hover { border-color: rgba(255, 59, 48, 0.8); color: #ff6a5c; }',
+      '.dsh-sm-add { width: 100%; height: 24px; margin-top: 6px; background: transparent; border: 1px dashed rgba(var(--dsh-accent-rgb), 0.4); color: rgba(var(--dsh-accent-text-rgb), 0.75); font-size: 11px; letter-spacing: 0.06em; cursor: pointer; }',
+      '.dsh-sm-add:hover:not([disabled]) { border-color: var(--dsh-accent); color: var(--dsh-accent-text); }',
+      '.dsh-sm-add[disabled] { opacity: 0.35; cursor: default; }',
       '.dsh-bg-tree-item { position: relative; z-index: 1; padding: 6px 12px 6px 47px; color: rgba(var(--dsh-accent-text-rgb), 0.72); font-size: 12px; letter-spacing: 0.06em; cursor: pointer; border-left: 2px solid transparent; transition: color .14s ease; }',
       /* 2.7.0：增强包的页签也带图标，和普通树节点同一套尺寸 */
       '.dsh-bg-tree-item.dsh-bg-tree-pack-item { display: flex; align-items: center; gap: 8px; padding-left: 14px; }',
@@ -2360,6 +2516,17 @@ const VV_OPTIONS = [
       '.dsh-preset-actions { display: flex; justify-content: flex-end; gap: 6px; }',
       '.dsh-preset-confirm { padding: 4px 12px; background: var(--dsh-accent); border: 1px solid var(--dsh-accent); color: var(--dsh-accent-ink) !important; font-size: 12px; cursor: pointer; }',
       '.dsh-preset-cancel { padding: 4px 12px; background: transparent; border: 1px solid rgba(var(--dsh-accent-rgb), 0.40); color: var(--dsh-accent-text) !important; font-size: 12px; cursor: pointer; }',
+      /* 2.8.1：预设代码（导出 / 导入）。代码区要能看清 JSON，用等宽字体；
+         长的单行 JSON 也按词内断行自动换行，不用横向拖 */
+      '.dsh-preset-form-title { font-size: 12px; letter-spacing: 0.10em; color: var(--dsh-accent-text); }',
+      '.dsh-preset-code { box-sizing: border-box; width: 100%; height: 132px; padding: 7px 8px; resize: vertical; background: rgba(var(--dsh-bg-base-rgb), 0.60); border: 1px solid rgba(var(--dsh-accent-rgb), 0.40); color: var(--dsh-accent-text); font: 11px/1.55 "Consolas", "Cascadia Mono", "Microsoft YaHei", monospace; outline: none; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; overflow-x: hidden; overflow-y: auto; tab-size: 2; }',
+      '.dsh-preset-code:focus { border-color: var(--dsh-accent); box-shadow: 0 0 12px rgba(var(--dsh-accent-rgb), 0.28); }',
+      '.dsh-preset-error { color: #ff5a4d !important; }',
+      /* 2.8.1：导出代码的提示直接弹在按钮上方（2 秒后消失），不再是预设页顶部那行状态字 */
+      '.dsh-bg-toast-wrap { position: relative; display: inline-flex; }',
+      '.dsh-bg-toast { position: absolute; right: 0; bottom: calc(100% + 9px); z-index: 3; padding: 5px 10px; white-space: nowrap; font-size: 11px; letter-spacing: 0.06em; color: var(--dsh-accent-ink) !important; background: var(--dsh-accent); border: 1px solid var(--dsh-accent); box-shadow: 0 0 16px rgba(var(--dsh-accent-rgb), 0.42); pointer-events: none; animation: dsh-toast-in .16s ease-out; }',
+      '.dsh-bg-toast::after { content: ""; position: absolute; right: 16px; top: 100%; width: 0; height: 0; border: 5px solid transparent; border-top-color: var(--dsh-accent); }',
+      '@keyframes dsh-toast-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }',
       /* 桌面端「安装并重启」更新按钮（settings-general 的 DesktopUpdateIndicator）：
          CSS 模块类名形如 VUhOWa_indicator，哈希会随版本变，所以用属性选择器匹配 */
       'button[class*="_indicator"] { border: 1px solid rgba(var(--dsh-accent-rgb), 0.45) !important; border-radius: 0 !important; background: rgba(var(--dsh-accent-rgb), 0.08) !important; color: var(--dsh-accent-text) !important; }',
@@ -4310,6 +4477,98 @@ const VV_OPTIONS = [
     };
     const visualContentOf = (visual) => visualColorOf(visual) || visualFxOf(visual);
     const hasVisualPack = (preset) => visualContentOf(preset && preset.visual);
+    /* ---- 预设代码（2.8.1 导出 / 导入）----------------------------------
+       一段自描述的 JSON：名称、标签、外观配置、HUD 布局快照、功能性开关，
+       外加一份增强包快照。visualOn 是导出那一刻按 visualContentOf 判出来的
+       「这条预设吃不吃增强包」，让看代码的人一眼分得清；导入端只读不存
+       （存的是原样的 visual 快照，所以「导出的什么样，导进来还是什么样」）。 */
+    const PRESET_CODE_FORMAT = 'dsh-exv-preset';
+    const PRESET_CODE_VERSION = 1;
+    const presetToCode = (preset) => JSON.stringify({
+      format: PRESET_CODE_FORMAT,
+      v: PRESET_CODE_VERSION,
+      name: String((preset && preset.name) || ''),
+      tags: (preset && preset.tags) || {},
+      visualOn: hasVisualPack(preset),
+      prefs: (preset && preset.prefs) || null,
+      visual: (preset && preset.visual) || null,
+      config: preset && preset.config,
+      layout: (preset && preset.layout) || null,
+    });
+    const presetFromCode = (code) => {
+      const text = String(code == null ? '' : code).trim();
+      if (!text) throw new Error('代码是空的，先粘贴一段预设代码。');
+      let data = null;
+      try { data = JSON.parse(text); } catch (error) { data = null; }
+      if (!data || typeof data !== 'object' || Array.isArray(data)) {
+        throw new Error('解析失败：这段内容不是合法的 JSON。');
+      }
+      if (data.format !== PRESET_CODE_FORMAT) {
+        throw new Error('这不是 DSH EXV 的预设代码（缺少 format 标记）。');
+      }
+      if (!data.config || typeof data.config !== 'object' || Array.isArray(data.config)) {
+        throw new Error('代码里没有可用的 config，无法创建预设。');
+      }
+      let config = null;
+      try { config = themeNormalize(data.config); } catch (error) {
+        throw new Error('代码里的 config 结构不认识，无法创建预设。');
+      }
+      const name = String(data.name == null ? '' : data.name).trim().slice(0, 40) || '导入的预设';
+      const tags = {};
+      if (data.tags && typeof data.tags === 'object' && !Array.isArray(data.tags)) {
+        Object.keys(data.tags).forEach((group) => {
+          if (typeof data.tags[group] === 'string' && data.tags[group]) tags[group] = data.tags[group];
+        });
+      }
+      return {
+        id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+        name,
+        /* 导入的一律进「用户自定义」：那张「＋ 以当前状态新建」就长在这个文件夹里 */
+        folder: '用户自定义',
+        tags,
+        config,
+        layout: data.layout && typeof data.layout === 'object' && !Array.isArray(data.layout) ? data.layout : null,
+        prefs: data.prefs && typeof data.prefs === 'object' && !Array.isArray(data.prefs) ? data.prefs : null,
+        visual: data.visual && typeof data.visual === 'object' && !Array.isArray(data.visual) ? data.visual : null,
+      };
+    };
+    /* 剪贴板读写：桌面端（Electron）里 navigator.clipboard 正常可用；
+       写不进去时退回老的 execCommand 通路，再不行返回 false，
+       由调用方退回「把代码显示出来手动复制」。 */
+    const writeClipboard = (text) => new Promise((resolve) => {
+      const legacy = () => {
+        try {
+          const box = document.createElement('textarea');
+          box.value = text;
+          box.style.position = 'fixed';
+          box.style.left = '-9999px';
+          box.style.opacity = '0';
+          document.body.appendChild(box);
+          box.select();
+          const ok = typeof document.execCommand === 'function' && document.execCommand('copy');
+          document.body.removeChild(box);
+          return ok === true;
+        } catch (error) {
+          return false;
+        }
+      };
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          navigator.clipboard.writeText(text).then(() => resolve(true), () => resolve(legacy()));
+          return;
+        }
+      } catch (error) { /* ignore */ }
+      resolve(legacy());
+    });
+    const readClipboard = () => new Promise((resolve) => {
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.readText === 'function') {
+          navigator.clipboard.readText().then((text) => resolve(typeof text === 'string' ? text : ''), () => resolve(''));
+          return;
+        }
+      } catch (error) { /* ignore */ }
+      resolve('');
+    });
     const presetThumbLayers = (config, art, isTemplate, visual, accentOf) => {
       if (!art) return null;
       const c = config || {};
@@ -4815,7 +5074,7 @@ const VV_OPTIONS = [
     };
 
 
-    function PresetSection({ config, onLoad, presets, onChangePresets, selectedId, onSelect }) {
+    function PresetSection({ config, onLoad, presets, onChangePresets, selectedId, onSelect, exportRef, onToast }) {
       const [filters, setFilters] = React.useState({});
       const [filtersOpen, setFiltersOpen] = React.useState(true);
       const [arts, setArts] = React.useState(readThumbArts);
@@ -4827,6 +5086,11 @@ const VV_OPTIONS = [
       const [draftTags, setDraftTags] = React.useState({});
       const [flash, setFlash] = React.useState('');
       const flashTimer = React.useRef(0);
+      /* 2.8.1：预设代码的导入面板与「剪贴板不可用」时的代码摊开面板 */
+      const [importing, setImporting] = React.useState(false);
+      const [importCode, setImportCode] = React.useState('');
+      const [importError, setImportError] = React.useState('');
+      const [codeBox, setCodeBox] = React.useState(null);
 
       React.useEffect(() => () => window.clearTimeout(flashTimer.current), []);
       /* 第一次打开预设页：没有缓存就在后台自动生成一次，之后长期复用 */
@@ -4892,6 +5156,68 @@ const VV_OPTIONS = [
         setFlash(text);
         window.clearTimeout(flashTimer.current);
         flashTimer.current = window.setTimeout(() => setFlash(''), 1800);
+      };
+
+      /* 导出代码：一键写进剪贴板；写不进去就把代码摊在网格下面让人手动复制。
+         提示走 onToast（弹在底部按钮上方），这个页面自己的 flash 只留载入 / 保存 / 导入。 */
+      const exportToast = (text) => { if (onToast) onToast(text); else notify(text); };
+      const exportSelected = () => {
+        const preset = presets.find((entry) => entry.id === selectedId) || null;
+        if (!preset) return;
+        const code = presetToCode(preset);
+        writeClipboard(code).then((ok) => {
+          if (ok) {
+            exportToast('已导出到剪贴板');
+            return;
+          }
+          setCodeBox({ title: '「' + preset.name + '」的代码', code });
+          exportToast('剪贴板不可用，代码在下面');
+        });
+      };
+      /* 底部的「导出代码」按钮长在 BackgroundEditor 里，通过这个 ref 调到这里来 */
+      React.useEffect(() => {
+        if (!exportRef) return;
+        exportRef.current = exportSelected;
+      });
+
+      const beginImport = () => {
+        setImporting(true);
+        setCodeBox(null);
+        setImportCode('');
+        setImportError('');
+      };
+      const pasteImport = () => {
+        readClipboard().then((text) => {
+          if (text) {
+            setImportCode(text);
+            setImportError('');
+            return;
+          }
+          setImportError('读不到剪贴板，请直接在输入框里 Ctrl+V 粘贴。');
+        });
+      };
+      const commitImport = () => {
+        let preset = null;
+        try {
+          preset = presetFromCode(importCode);
+        } catch (error) {
+          setImportError(error && error.message ? error.message : '代码无法识别。');
+          return;
+        }
+        const next = readPresets();
+        /* writePresets 会裁到 60 条：满了再 push 会把刚导入的那条裁掉，所以先拦一下 */
+        if (next.length >= 60) {
+          setImportError('预设已经存了 60 条（上限），先删掉一条再导入。');
+          return;
+        }
+        next.push(preset);
+        writePresets(next);
+        try { prepareArt(); } catch (error) { /* 缩略图补渲失败不影响导入 */ }
+        if (onChangePresets) onChangePresets(next);
+        setImporting(false);
+        setImportCode('');
+        setImportError('');
+        notify('已导入 ' + preset.name);
       };
 
       /* 同一分类里可以多选（值之间是 OR）；再次点已选中的值取消选择。
@@ -5050,16 +5376,28 @@ const VV_OPTIONS = [
               rows.push({ id: '__folder__' + folder, __folder: folder });
               if (collapsedFolders.indexOf(folder) >= 0) return;
               inFolder.forEach((preset) => rows.push(preset));
-              if (folder === '用户自定义') rows.push({ id: '__add_preset__', __add: true });
+              if (folder === '用户自定义') {
+                rows.push({ id: '__add_preset__', __add: true });
+                rows.push({ id: '__import_preset__', __import: true });
+              }
             });
             return rows;
           })().map((preset) => preset.__add
             ? (adding ? null : h('div', {
+                key: preset.id,
                 className: 'dsh-bg-card dsh-preset-card dsh-preset-add',
                 role: 'button',
                 title: '把当前外观设置存成一个新预设',
                 onClick: beginAdd,
               }, h('span', null, '＋ 以当前状态新建')))
+            : preset.__import
+            ? (importing ? null : h('div', {
+                key: preset.id,
+                className: 'dsh-bg-card dsh-preset-card dsh-preset-add',
+                role: 'button',
+                title: '粘贴一段预设代码，新建一条预设',
+                onClick: beginImport,
+              }, h('span', null, '↓ 从代码导入')))
             : preset.__folder
             ? h('div', {
                 key: preset.id,
@@ -5120,6 +5458,56 @@ const VV_OPTIONS = [
           h('div', { className: 'dsh-preset-actions' },
             h('button', { type: 'button', className: 'dsh-preset-cancel', onClick: () => setAdding(false) }, '取消'),
             h('button', { type: 'button', className: 'dsh-preset-confirm', onClick: commitAdd }, '保存'))) : null,
+        importing ? h('div', { className: 'dsh-preset-form' },
+          h('div', { className: 'dsh-preset-form-title' }, '从代码导入预设'),
+          h('textarea', {
+            className: 'dsh-preset-code',
+            value: importCode,
+            autoFocus: true,
+            spellCheck: false,
+            placeholder: '把导出的预设代码粘贴到这里（代码里带着预设名称）',
+            onChange: (event) => {
+              setImportCode(event.target.value);
+              if (importError) setImportError('');
+            },
+            onKeyDown: (event) => {
+              if (event.key === 'Escape') setImporting(false);
+              if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) commitImport();
+            },
+          }),
+          importError ? h('div', { className: 'dsh-preset-tip dsh-preset-error' }, importError) : null,
+          h('div', { className: 'dsh-preset-tip' }, '代码里带着名称、标签、外观配置、HUD 布局和增强包状态；导入后放进「用户自定义」。Ctrl + 回车 也能直接新建。'),
+          h('div', { className: 'dsh-preset-actions' },
+            h('button', {
+              type: 'button',
+              className: 'dsh-preset-cancel',
+              onClick: () => { setImportCode(''); setImportError(''); },
+            }, '清空'),
+            h('button', { type: 'button', className: 'dsh-preset-cancel', onClick: pasteImport }, '粘贴'),
+            h('button', { type: 'button', className: 'dsh-preset-cancel', onClick: () => setImporting(false) }, '取消'),
+            h('button', { type: 'button', className: 'dsh-preset-confirm', onClick: commitImport }, '新建'))) : null,
+        codeBox ? h('div', { className: 'dsh-preset-form' },
+          h('div', { className: 'dsh-preset-form-title' }, codeBox.title),
+          h('textarea', {
+            className: 'dsh-preset-code',
+            value: codeBox.code,
+            readOnly: true,
+            autoFocus: true,
+            spellCheck: false,
+            onFocus: (event) => event.target.select(),
+          }),
+          h('div', { className: 'dsh-preset-tip' }, '剪贴板不可用，全选复制这段代码即可；关掉面板不影响预设本身。'),
+          h('div', { className: 'dsh-preset-actions' },
+            h('button', { type: 'button', className: 'dsh-preset-cancel', onClick: () => setCodeBox(null) }, '关闭'),
+            h('button', {
+              type: 'button',
+              className: 'dsh-preset-confirm',
+              onClick: () => {
+                writeClipboard(codeBox.code).then((ok) => {
+                  if (ok) { setCodeBox(null); exportToast('已复制到剪贴板'); }
+                });
+              },
+            }, '复制'))) : null,
       );
     }
 
@@ -5305,6 +5693,425 @@ const VV_OPTIONS = [
         options.map(card));
     }
 
+    /* 默认包（背景 / LOGO / 动态主人物）的卡片网格。folders 就是 CARD_FOLDERS 那一套：
+       文件夹与卡片同尺寸，缩略图 = 组内前 9 张卡的九宫格，点开多一张「返回」；
+       当前选中项在组里时，文件夹跟着亮起「选中」描边，好知道自己的设置在哪一组。
+       文件夹只是展示分组——点卡片写入的仍是卡片自己的 id。 */
+    function BaseCardGrid(props) {
+      const options = Array.isArray(props.options) ? props.options : [];
+      const folders = Array.isArray(props.folders) ? props.folders : [];
+      const value = props.value;
+      const applyValue = props.applyValue;
+      const extra = {};
+      Object.keys(props).forEach((key) => {
+        if (key === 'options' || key === 'folders' || key === 'value' || key === 'applyValue') return;
+        extra[key] = props[key];
+      });
+      const [folder, setFolder] = React.useState(null);
+      const currentFolder = folder ? (folders.find((entry) => entry.id === folder) || null) : null;
+      /* 主人物在「静态 / 动态」之间切换时，动态度那套组会消失：把状态收回，
+         免得下次切回动态时莫名停在一个旧组里。 */
+      React.useEffect(() => {
+        if (!folder) return;
+        if (folders.some((entry) => entry.id === folder)) return;
+        setFolder(null);
+      }, [folder, folders]);
+      const shown = currentFolder ? currentFolder.options : options;
+      const pick = (id) => applyValue(id);
+      const card = (option) => h('div', {
+        key: option.id,
+        className: 'dsh-bg-card',
+        'data-thumb': option.thumb ? '' : undefined,
+        role: 'radio',
+        'aria-checked': option.id === value ? 'true' : 'false',
+        'data-selected': option.id === value ? '' : undefined,
+        'data-disabled': option.disabled ? '' : undefined,
+        tabIndex: option.disabled ? -1 : 0,
+        onClick: () => { if (!option.disabled) pick(option.id); },
+        onKeyDown: (event) => {
+          if (option.disabled) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            pick(option.id);
+          }
+        },
+      },
+        h('div', {
+          className: 'dsh-bg-thumb',
+          style: option.thumb ? {
+            backgroundImage: 'url("' + option.thumb + '")',
+            backgroundSize: option.fit === 'contain' ? 'contain' : 'cover',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+          } : undefined,
+        }),
+        option.eye === false ? h('span', {
+          className: 'dsh-bg-card-badge',
+          title: '不支持眼动追踪',
+          'aria-label': '不支持眼动追踪',
+        },
+          h('svg', { viewBox: '0 0 16 16', 'aria-hidden': 'true' },
+            h('path', {
+              d: 'M16 0 16 16 0 0Z',
+              fill: accentRgba(0.12),
+              stroke: accentRgba(0.42),
+              'stroke-width': '1',
+              'stroke-linejoin': 'miter',
+            }),
+            h('path', {
+              d: 'M9.1 5.3h3.2',
+              fill: 'none',
+              stroke: accentRgba(0.55),
+              'stroke-width': '1.4',
+              'stroke-linecap': 'square',
+            })),
+        ) : null,
+        h('div', { className: 'dsh-bg-card-text' }, option.label));
+      const folderCard = (entry) => {
+        const kids = entry.options.slice(0, 9);
+        const active = entry.options.some((kid) => kid.id === value);
+        return h('div', {
+          key: entry.id,
+          className: 'dsh-bg-card dsh-pack-folder',
+          role: 'button',
+          title: entry.label,
+          tabIndex: 0,
+          'data-selected': active ? '' : undefined,
+          onClick: () => setFolder(entry.id),
+          onKeyDown: (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            setFolder(entry.id);
+          },
+        },
+          h('div', { className: 'dsh-pack-folder-grid' },
+            kids.map((kid, index) => h('span', {
+              key: (kid.id || 'cell') + '-' + index,
+              className: 'dsh-pack-folder-cell',
+              style: kid.thumb ? {
+                backgroundImage: 'url("' + kid.thumb + '")',
+                backgroundSize: kid.fit === 'contain' ? 'contain' : 'cover',
+              } : undefined,
+            }))),
+          h('div', { className: 'dsh-bg-card-text' }, entry.label));
+      };
+      return h('div', Object.assign({ className: 'dsh-bg-cards' }, extra),
+        currentFolder
+          ? h('div', {
+            key: '__back',
+            className: 'dsh-bg-card dsh-pack-back',
+            role: 'button',
+            title: '返回',
+            tabIndex: 0,
+            onClick: () => setFolder(null),
+            onKeyDown: (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              setFolder(null);
+            },
+          },
+            h('div', { className: 'dsh-pack-back-text' }, '‹'),
+            h('div', { className: 'dsh-bg-card-text' }, '返回'))
+          : folders.map(folderCard),
+        shown.map(card));
+    }
+
+    /* 全局菜单的图标：战地 2042 加载动画的简化版（1.6s 一圈：十字 → 实心方块 → 弹开转 45° 成 ×）。
+       glitch 那一拍在外面一层、旋转在里面一层，两层 transform 互不干扰。 */
+    const superMenuGlyph = (px) => h('svg', {
+      viewBox: '0 0 12 12',
+      width: String(px),
+      height: String(px),
+      fill: 'none',
+      'aria-hidden': 'true',
+    },
+      h('g', { className: 'dsh-menu-glitch' },
+        h('g', { className: 'dsh-menu-spin' },
+          h('rect', { x: '4.8', y: '2.4', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '0px', '--my': '1.2px' } }),
+          h('rect', { x: '7.2', y: '4.8', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '-1.2px', '--my': '0px' } }),
+          h('rect', { x: '4.8', y: '7.2', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '0px', '--my': '-1.2px' } }),
+          h('rect', { x: '2.4', y: '4.8', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '1.2px', '--my': '0px' } }))));
+
+    /* 全局菜单 · 摆位设置（2.9.0）。完全独立的设置：不进配置 / 预设 / 底部草稿，
+       改完即时写 dsh-exv-supermenu.v1。
+       九宫格 = 菜单里那 9 格（正中的细框是固定焦点框，不可装配）；功能池 = 还没装上的功能。
+       规则（vv 定的）：格子占用后不能直接替换，要先把格子里的功能拖回池子腾位置。 */
+    function SuperMenuPane() {
+      const [settings, setSettings] = React.useState(() => superMenuSettings());
+      const [drag, setDrag] = React.useState(null);
+      const [pathOpen, setPathOpen] = React.useState(true);
+      const [status, setStatus] = React.useState('');
+      const cellRefs = React.useRef({});
+      const poolRef = React.useRef(null);
+      const hostRef = React.useRef(null);
+      const slots = settings.slots;
+      const commit = (patch) => setSettings(superMenuPatch(patch));
+      /* 功能配置：打开路径的一级子格（名称 + 绝对路径），即时写进同一份独立设置 */
+      const pathRows = settings.features.path.rows;
+      const setPathRows = (rows) => commit({ features: { path: { rows } } });
+      const addPathRow = () => {
+        if (pathRows.length >= SUPER_PATH_ROWS_MAX) return;
+        setPathRows(pathRows.concat([{ id: 'p' + Date.now().toString(36), label: '', path: '' }]));
+      };
+      const updatePathRow = (id, patch) => {
+        setPathRows(pathRows.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+      };
+      const removePathRow = (id) => setPathRows(pathRows.filter((row) => row.id !== id));
+      const slotOn = (slot) => (slot === 'ne' || slot === 'se' || slot === 'sw' || slot === 'nw' ? settings.second : true);
+      const placed = {};
+      SUPER_MENU_SLOT_ORDER.forEach((slot) => { if (slots[slot]) placed[slots[slot]] = slot; });
+      const pool = SUPER_FEATURE_POOL.filter((feature) => !placed[feature.id]);
+      const labelOf = (id) => {
+        const feature = SUPER_FEATURE_POOL.find((item) => item.id === id);
+        return feature ? feature.label : '';
+      };
+
+      const startDrag = (event, id, from) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const startX = event.clientX;
+        const startY = event.clientY;
+        let live = false;
+        /* 面板自己是 position: fixed + backdrop-filter，会被浏览器当成 fixed 后代的包含块：
+           拖动块按视口坐标摆就会整块漂到屏幕右下角。改成挂到面板里、按面板坐标摆。 */
+        const node = event.currentTarget;
+        const host = node && typeof node.closest === 'function' ? node.closest('.dsh-bg-panel') : null;
+        hostRef.current = host;
+        const pointOf = (ev) => {
+          if (!host) return { x: ev.clientX, y: ev.clientY, mode: 'fixed' };
+          const rect = host.getBoundingClientRect();
+          return {
+            x: ev.clientX - rect.left - host.clientLeft,
+            y: ev.clientY - rect.top - host.clientTop,
+            mode: 'abs',
+          };
+        };
+        const overAt = (x, y) => {
+          let hit = null;
+          SUPER_MENU_SLOT_ORDER.forEach((key) => {
+            const node = cellRefs.current[key];
+            if (!node) return;
+            const rect = node.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) hit = key;
+          });
+          if (hit) {
+            if (!slotOn(hit)) return { type: 'muted', slot: hit };
+            if (hit === from) return { type: 'none' };
+            if (slots[hit]) return { type: 'bad', slot: hit };
+            return { type: 'cell', slot: hit };
+          }
+          const poolNode = poolRef.current;
+          if (poolNode) {
+            const rect = poolNode.getBoundingClientRect();
+            if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) return { type: 'pool' };
+          }
+          return { type: 'none' };
+        };
+        const onMove = (ev) => {
+          if (!live) {
+            if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 5) return;
+            live = true;
+          }
+          const point = pointOf(ev);
+          setDrag({ id, from, x: point.x, y: point.y, mode: point.mode, over: overAt(ev.clientX, ev.clientY) });
+        };
+        const onUp = (ev) => {
+          window.removeEventListener('pointermove', onMove, true);
+          window.removeEventListener('pointerup', onUp, true);
+          window.removeEventListener('pointercancel', onUp, true);
+          setDrag(null);
+          if (!live) return;
+          const target = overAt(ev.clientX, ev.clientY);
+          if (target.type === 'muted') {
+            setStatus('对角那四格要先打开上面的「第二批 5~8」才能放。');
+            return;
+          }
+          if (target.type === 'bad') {
+            setStatus('这一格已经被占用了：先把它拖回功能池腾位置，再放新的。');
+            return;
+          }
+          if (from === 'pool' && target.type === 'cell') {
+            commit({ slots: { ...slots, [target.slot]: id } });
+            setStatus('已装配：' + labelOf(id));
+            return;
+          }
+          if (from !== 'pool' && target.type === 'cell' && target.slot !== from) {
+            /* 从一格挪到另一格（目标必须是空格子；占用的情况上面已经拦下） */
+            commit({ slots: { ...slots, [from]: null, [target.slot]: id } });
+            setStatus('已移动：' + labelOf(id));
+            return;
+          }
+          if (from !== 'pool' && target.type === 'pool') {
+            commit({ slots: { ...slots, [from]: null } });
+            setStatus('已放回功能池：' + labelOf(id));
+          }
+        };
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('pointerup', onUp, true);
+        window.addEventListener('pointercancel', onUp, true);
+      };
+
+      /* 「菜单会显示什么」直接读存储里的那份（不是本地草稿），
+         这样万一写盘失败或者菜单读到旧值，这里会当场露馅。 */
+      const storedNow = superMenuSettings();
+      const menuSummary = SUPER_MENU_SLOT_ORDER
+        .map((slot) => storedNow.slots[slot])
+        .filter(Boolean)
+        .map((id) => labelOf(id))
+        .join(' · ');
+
+      const cellNode = (slot) => {
+        const id = slots[slot];
+        const empty = !id;
+        const muted = !slotOn(slot);
+        const over = Boolean(drag && drag.over && drag.over.type === 'cell' && drag.over.slot === slot);
+        const bad = Boolean(drag && drag.over && drag.over.type === 'bad' && drag.over.slot === slot);
+        const attrs = {
+          key: slot,
+          className: 'dsh-sm-cell',
+          'data-cardinal': slot === 'n' || slot === 'e' || slot === 's' || slot === 'w' ? '' : undefined,
+          'data-empty': empty ? '' : undefined,
+          'data-filled': empty ? undefined : '',
+          'data-muted': muted ? '' : undefined,
+          'data-drop': over ? '' : undefined,
+          'data-bad': bad ? '' : undefined,
+          title: muted
+            ? '第二批关掉时这四格不参与'
+            : (empty ? '把功能池里的小方块拖到这里' : '拖回功能池可以腾出这一格'),
+          ref: (node) => { cellRefs.current[slot] = node; },
+        };
+        if (!empty && !muted) attrs.onPointerDown = (event) => startDrag(event, id, slot);
+        const inner = [];
+        if (empty) {
+          inner.push(h('svg', { key: 'ants', className: 'dsh-sm-ants', viewBox: '0 0 82 82', preserveAspectRatio: 'none' },
+            h('rect', { x: '1', y: '1', width: '80', height: '80' })));
+          inner.push(h('span', { key: 'plus', className: 'dsh-sm-plus' }, '+'));
+        } else {
+          inner.push(h('span', { key: 'icon', className: 'dsh-sm-cell-icon' }, superFeatureIcon(id, 15)));
+          inner.push(h('span', { key: 'name', className: 'dsh-sm-name' }, labelOf(id)));
+        }
+        return h('div', attrs, inner);
+      };
+
+      const lines = [['nw', 'n', 'ne'], ['w', null, 'e'], ['sw', 's', 'se']];      const gridNodes = [];
+      lines.forEach((line) => line.forEach((slot) => {
+        if (!slot) {
+          gridNodes.push(h('div', { key: 'center', className: 'dsh-sm-cell', 'data-center': '', title: '焦点框（固定，不参与装配）' },
+            h('div', { className: 'dsh-sm-frame' })));
+          return;
+        }
+        gridNodes.push(cellNode(slot));
+      }));
+
+      const poolNode = h('div', {
+        key: 'pool',
+        ref: poolRef,
+        className: 'dsh-sm-pool',
+        'data-drop': drag && drag.over && drag.over.type === 'pool' ? '' : undefined,
+      }, pool.length === 0
+        ? h('div', { className: 'dsh-sm-pool-empty' }, '功能已经全部装在格子里了。把某个格子里的功能拖回这里，就能腾出位置重新放。')
+        : pool.map((feature) => h('div', {
+          key: feature.id,
+          className: 'dsh-sm-chip',
+          title: feature.hint,
+          'data-dragging': drag && drag.id === feature.id && drag.from === 'pool' ? '' : undefined,
+          onPointerDown: (event) => startDrag(event, feature.id, 'pool'),
+        },
+          h('span', { className: 'dsh-sm-chip-icon' }, superFeatureIcon(feature.id, 15)),
+          h('span', { className: 'dsh-sm-chip-label' }, feature.label))));
+
+      const switchRow = (label, control, extra) => h('div', { className: 'dsh-bg-row' },
+        h('div', { className: 'dsh-bg-label' }, label),
+        h('div', { className: 'dsh-bg-control' },
+          h('span', { className: 'dsh-bg-live-tag' }, '即时'),
+          control,
+          extra));
+
+      const ghost = drag ? h('div', {
+        className: 'dsh-sm-ghost',
+        'data-fixed': drag.mode === 'fixed' ? '' : undefined,
+        style: { left: drag.x + 'px', top: drag.y + 'px' },
+      },
+        h('span', { className: 'dsh-sm-chip-icon' }, superFeatureIcon(drag.id, 15)),
+        h('span', { className: 'dsh-sm-chip-label' }, labelOf(drag.id))) : null;
+      const ghostNode = ghost && hostRef.current && createPortal ? createPortal(ghost, hostRef.current) : ghost;
+
+      return h('div', { className: 'dsh-bg-section' },
+        h('div', { className: 'dsh-sm-note' }, '全局菜单是独立设置：不进主题配置、不进预设，也不参与底部的「保存 / 应用」草稿，改完即时生效。'),
+        switchRow('全局菜单', h(Switch, { on: settings.on, onChange: (next) => commit({ on: next }) })),
+        switchRow('第二批 5~8', h('span', { className: settings.on ? '' : 'dsh-sm-disabled' },
+          h(Switch, { on: settings.second, onChange: (next) => commit({ second: next }) }))),
+        h('div', { className: 'dsh-sm-note' }, settings.on
+          ? '关掉第二批后，5~8 四格不会出现在菜单里，装在那四格的功能会自动退回功能池。'
+          : '总开关关着：右键长按不再呼出菜单（宿主的原生右键菜单照常），第二批的开关也先不可用。'),
+        h('div', { className: 'dsh-bg-group-title' }, '九宫格摆位'),
+        h('div', { className: 'dsh-sm-grid' }, gridNodes),
+        h('div', { className: 'dsh-sm-note' }, '外圈八格对应菜单里的八个母格（上 / 右 / 下 / 左，加四个对角）；正中的细框是鼠标处那个焦点框，固定不参与装配。虚线 + 号的格子表示还没装配。'),
+        h('div', { className: 'dsh-sm-status' }, status || '把功能池里的小方块拖到九宫格上就装进去；拖回功能池腾出位置，也可以直接拖到另一个空格子上。'),
+        h('div', { className: 'dsh-sm-sum' }, '菜单会显示：' + (menuSummary || '（空白，只有中心框）') + (settings.second ? '' : '（第二批关着）')),
+        superMenuPersistOk() ? null : h('div', { className: 'dsh-sm-warn' }, '这一页的设置写不进浏览器存储（可能配额满了），改动只在当前窗口有效。'),
+        h('div', { className: 'dsh-bg-group-title' }, '功能池'),
+        poolNode,
+        h('div', { className: 'dsh-sm-note' }, '把池子里的小方块拖到九宫格上就装进去（松手前目标格子会整块高亮）；格子已经占用时不能直接替换，先把那一格的功能拖回池子腾出位置，再放新的。'),
+        h('div', { className: 'dsh-bg-group-title' }, '功能配置'),
+        h('div', { className: 'dsh-sm-note' }, '给「需要内容」的功能填实际东西（现在只有「打开路径」）。名称最多 12 字；路径要写完整绝对路径，例如 C:\\DSH Workload 或 \\\\NAS\\share。没配内容的「打开路径」拖进母格会显示成不可用（警戒线）。'),
+        h('div', { className: 'dsh-sm-tree' },
+          h('div', {
+            className: 'dsh-sm-tree-root',
+            role: 'button',
+            tabIndex: 0,
+            'data-open': pathOpen ? '' : undefined,
+            onClick: () => setPathOpen((value) => !value),
+            onKeyDown: (event) => {
+              if (event.key !== 'Enter' && event.key !== ' ') return;
+              event.preventDefault();
+              setPathOpen((value) => !value);
+            },
+          },
+            h('span', { className: 'dsh-sm-caret' }, pathOpen ? '▾' : '▸'),
+            h('span', null, '打开路径'),
+            h('span', { className: 'dsh-sm-tree-count' }, pathRows.length + ' / ' + SUPER_PATH_ROWS_MAX)),
+          pathOpen ? h('div', { className: 'dsh-sm-tree-kids' },
+            pathRows.map((row) => h('div', { key: row.id, className: 'dsh-sm-tree-row' },
+              h('input', {
+                className: 'dsh-sm-input dsh-sm-input-name',
+                value: row.label,
+                maxLength: SUPER_PATH_NAME_MAX,
+                placeholder: '名称',
+                title: '名称最多 ' + SUPER_PATH_NAME_MAX + ' 个字',
+                onChange: (event) => updatePathRow(row.id, { label: event.target.value.slice(0, SUPER_PATH_NAME_MAX) }),
+              }),
+              h('input', {
+                className: 'dsh-sm-input dsh-sm-input-path',
+                value: row.path,
+                placeholder: 'C:\\绝对路径',
+                'data-bad': row.path.trim() && !superPathIsAbsolute(row.path.trim()) ? '' : undefined,
+                title: '要打开的完整绝对路径（文件夹或文件）',
+                onChange: (event) => updatePathRow(row.id, { path: event.target.value }),
+              }),
+              h('button', {
+                type: 'button',
+                className: 'dsh-sm-row-del',
+                title: '删除这条',
+                onClick: () => removePathRow(row.id),
+              }, '×'))),
+            h('button', {
+              type: 'button',
+              className: 'dsh-sm-add',
+              disabled: pathRows.length >= SUPER_PATH_ROWS_MAX,
+              onClick: addPathRow,
+            }, '＋ 添加子格')) : null),
+        h('div', { className: 'dsh-sm-actions' },
+          h('button', {
+            type: 'button',
+            className: 'dsh-bg-btn',
+            onClick: () => commit({ slots: { ...superMenuDefaults().slots } }),
+          }, '恢复默认摆法'),
+          h('span', { className: 'dsh-sm-sum' }, '已装配 ' + Object.keys(placed).length + ' / ' + SUPER_FEATURE_POOL.length)),
+        ghostNode);
+    }
+
     function BackgroundEditor({ store, onClose }) {
       const [saved, setSaved] = React.useState(() => themeClone(store.get()));
       const [draft, setDraft] = React.useState(() => themeClone(store.get()));
@@ -5337,6 +6144,17 @@ const VV_OPTIONS = [
          applyVisualDefaults()，于是单纯改个格阵开关再点应用，就会把增强包的超高清背景、调色一起清掉。 */
       const pendingPresetRef = React.useRef(false);
       const pendingFactoryRef = React.useRef(false);
+      /* 2.8.1：底部「导出代码」按钮 → 预设页里的导出逻辑（代码与提示都在 PresetSection 里） */
+      const presetExportRef = React.useRef(null);
+      /* 导出结果的提示直接弹在按钮上方，2 秒后消失 */
+      const [exportToast, setExportToast] = React.useState('');
+      const exportToastTimer = React.useRef(0);
+      React.useEffect(() => () => window.clearTimeout(exportToastTimer.current), []);
+      const showExportToast = (text) => {
+        setExportToast(text);
+        window.clearTimeout(exportToastTimer.current);
+        exportToastTimer.current = window.setTimeout(() => setExportToast(''), 2000);
+      };
       const [pendingLayout, setPendingLayout] = React.useState(false);
       /* 开场动画开关单独存盘（localStorage.dsh-exv-boot），不走草稿 / 应用那套 */
       const [bootOn, setBootOn] = React.useState(isBootEnabled);
@@ -5448,8 +6266,8 @@ const VV_OPTIONS = [
         const view = readStoredJson(BG_VIEW_KEY);
         if (!view || typeof view !== 'object') return;
         const wanted = typeof view.node === 'string' ? (BG_NODE_ALIAS[view.node] || view.node) : '';
-        const exists = typeof wanted === 'string' && wanted !== '' && TREE.some((group) => group.id === wanted
-          || (Array.isArray(group.children) && group.children.some((child) => child.id === wanted)));
+        const exists = typeof wanted === 'string' && wanted !== '' && (wanted === 'menu' || TREE.some((group) => group.id === wanted
+          || (Array.isArray(group.children) && group.children.some((child) => child.id === wanted))));
         if (exists) setNode(wanted);
         /* 只恢复「关闭前最后展开的那一棵」：面板是手风琴式，任何时刻最多展开一个根节点。
            旧数据里可能存着多个 key（历史版本允许同时展开），这时优先选包含当前设置页的那组，
@@ -5811,57 +6629,13 @@ const VV_OPTIONS = [
           h(Slider, { value, min, max, onChange: applyValue, variant }),
         ));
 
-      const cardList = (options, value, applyValue) => h('div', { className: 'dsh-bg-cards' },
-        options.map((option) => h('div', {
-          key: option.id,
-          className: 'dsh-bg-card',
-          'data-thumb': option.thumb ? '' : undefined,
-          role: 'radio',
-          'aria-checked': option.id === value ? 'true' : 'false',
-          'data-selected': option.id === value ? '' : undefined,
-          'data-disabled': option.disabled ? '' : undefined,
-          tabIndex: option.disabled ? -1 : 0,
-          onClick: () => { if (!option.disabled) applyValue(option.id); },
-          onKeyDown: (event) => {
-            if (option.disabled) return;
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              applyValue(option.id);
-            }
-          },
-        },
-          h('div', {
-            className: 'dsh-bg-thumb',
-            style: option.thumb ? {
-              backgroundImage: 'url("' + option.thumb + '")',
-              backgroundSize: option.fit === 'contain' ? 'contain' : 'cover',
-              backgroundRepeat: 'no-repeat',
-              backgroundPosition: 'center',
-            } : undefined,
-          }),
-          option.eye === false ? h('span', {
-            className: 'dsh-bg-card-badge',
-            title: '不支持眼动追踪',
-            'aria-label': '不支持眼动追踪',
-          },
-            h('svg', { viewBox: '0 0 16 16', 'aria-hidden': 'true' },
-              h('path', {
-                d: 'M16 0 16 16 0 0Z',
-                fill: accentRgba(0.12),
-                stroke: accentRgba(0.42),
-                'stroke-width': '1',
-                'stroke-linejoin': 'miter',
-              }),
-              h('path', {
-                d: 'M9.1 5.3h3.2',
-                fill: 'none',
-                stroke: accentRgba(0.55),
-                'stroke-width': '1.4',
-                'stroke-linecap': 'square',
-              })),
-          ) : null,
-          h('div', { className: 'dsh-bg-card-text' }, option.label),
-        )));
+      /* 卡片网格交给 BaseCardGrid：传 folders 就有分组文件夹（背景 / LOGO / 动态主人物） */
+      const cardList = (options, value, applyValue, folders) => h(BaseCardGrid, {
+        options,
+        value,
+        applyValue,
+        folders,
+      });
 
       const groupTitle = (text) => h('div', { className: 'dsh-bg-group-title' }, text);
 
@@ -5874,7 +6648,8 @@ const VV_OPTIONS = [
       ];
 
       /* 2.7.1：每层一份「鼠标视差」——开关 + 强度（100% = 该层原来的位移幅度）。
-         开关和强度都即时生效，和旁边那组「位移呼吸」同一套手感。 */
+         开关和强度都即时生效，和旁边那组「位移呼吸」同一套手感。
+         2.8.1：组件层与 LOGO 层同参数（18px 基准 / 0–200%），位移量一样多。 */
       const parallaxRows = (layer) => {
         const item = (draft.parallax && draft.parallax[layer]) || { enabled: true, strength: 100 };
         return [
@@ -5919,10 +6694,13 @@ const VV_OPTIONS = [
           { id: 'other/boot', label: '开场动画' },
         ] },
         { id: 'presets', label: '预设' },
+        /* 2.9.0：全局菜单不再挂在树里——入口挪到增强包选择框上面那颗独立按钮
+           （图标是战地 2042 那种加载动画，悬停 / 打开时滑出）。node 仍然是 'menu'。 */
       ];
 
       const nodeLabel = (() => {
         if (activePack) return (activePack.title || '增强包设置') + (activeSection && activeSection.title ? ' / ' + activeSection.title : '');
+        if (node === 'menu') return '全局菜单';
         if (!node) return '设置';
         for (const group of TREE) {
           if (group.id === node) return group.label;
@@ -5965,6 +6743,14 @@ const VV_OPTIONS = [
           h('path', { d: 'M1.6 3.2h8.8v6.4H1.6z' }),
           h('path', { d: 'M1.6 3.2h4.2v1.6H1.6z', fill: 'currentColor', stroke: 'none' }));
         if (id === 'sfx') return h('svg', common, h('path', { d: 'M6 1.2 7 5 10.8 6 7 7 6 10.8 5 7 1.2 6 5 5Z' }));
+        /* 全局菜单：战地 2042 加载动画（2.9.0）。4 个方块拼成带方孔的十字，
+           收拢成实心方块，再弹开并整组转 45° 成菱形「×」，一圈 1.6s 接回十字。 */
+        if (id === 'menu') return h('svg', common,
+          h('g', { className: 'dsh-menu-spin' },
+            h('rect', { x: '4.8', y: '2.4', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '0px', '--my': '1.2px' } }),
+            h('rect', { x: '7.2', y: '4.8', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '-1.2px', '--my': '0px' } }),
+            h('rect', { x: '4.8', y: '7.2', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '0px', '--my': '-1.2px' } }),
+            h('rect', { x: '2.4', y: '4.8', width: '2.4', height: '2.4', fill: 'currentColor', stroke: 'none', className: 'dsh-menu-arm', style: { '--mx': '1.2px', '--my': '0px' } })));
         /* 增强包页签的图标（2.7.0）：按 section id 取，pack 里也可以用 section.icon 指定 */
         if (id === 'boot') return h('svg', common, h('path', { d: 'M4.4 2.7 9.3 6 4.4 9.3Z', fill: 'currentColor', stroke: 'none' }));
         if (id === 'effects' || id === 'fx') return h('svg', common,
@@ -6166,11 +6952,13 @@ const VV_OPTIONS = [
           const bgOptions = BACKGROUND_OPTIONS.map((option) => (
             option.id === 'solid' ? Object.assign({}, option, { thumb: solidThumb(draft.background.solidColor) }) : option
           ));
+          /* Rocket Launch 文件夹：3 张 SpaceX + CZ-5，只做分组，选中仍是背景卡自己的 id */
+          const bgCards = splitCardFolders(bgOptions, CARD_FOLDERS.background);
           return h('div', { className: 'dsh-bg-section' },
             overrides['background.preset']
               ? h('div', { className: 'dsh-bg-hint dsh-bg-overridden-note' }, overrideTip('background.preset') + '（去增强包页调整）')
               : null,
-            overridable('background.preset', cardList(bgOptions, draft.background.preset, (id) => patch({ background: { preset: id } }))),
+            overridable('background.preset', cardList(bgCards.rest, draft.background.preset, (id) => patch({ background: { preset: id } }), bgCards.folders)),
             draft.background.preset === 'solid'
               ? h('div', { className: 'dsh-bg-section' },
                   groupTitle('纯色背景'),
@@ -6205,10 +6993,12 @@ const VV_OPTIONS = [
           const live2dCfg = (draft.vv.live2dConfig && draft.vv.live2dConfig[live2dId]) || { scale: 180, x: -9, y: 52, eye: true };
           const staticCfg = draft.vv.staticConfig || { scale: 100, x: 0, y: 0 };
           const faceSupported = !LIVE2D_NO_FACE[live2dId];
+          /* 动态主人物按角色分文件夹：一个角色有多张卡时才建组，单卡的照旧平铺 */
+          const live2dCards = splitCardFolders(LIVE2D_OPTIONS, CARD_FOLDERS.live2d);
           const presetCards = mode === 'static'
             ? cardList(VV_OPTIONS.filter((option) => option.group === '静态'), draft.vv.preset, (id) => patch({ vv: { mode: 'static', preset: id } }))
             : mode === 'live2d'
-              ? cardList(LIVE2D_OPTIONS, draft.vv.live2d, (id) => patch({ vv: { mode: 'live2d', live2d: id } }))
+              ? cardList(live2dCards.rest, draft.vv.live2d, (id) => patch({ vv: { mode: 'live2d', live2d: id } }), live2dCards.folders)
               : groupTitle('主人物已关闭');
           return h('div', { className: 'dsh-bg-section' },
             h(Segmented, {
@@ -6260,8 +7050,10 @@ const VV_OPTIONS = [
         }
 
         if (node === 'other/logo') {
+          /* 三个 LOGO 统一进 EXV Origin 文件夹 */
+          const logoCards = splitCardFolders(LOGO_OPTIONS, CARD_FOLDERS.logo);
           return h('div', { className: 'dsh-bg-section' },
-            cardList(LOGO_OPTIONS, draft.logos.preset, (id) => patch({ logos: { preset: id } })),
+            cardList(logoCards.rest, draft.logos.preset, (id) => patch({ logos: { preset: id } }), logoCards.folders),
             row('显示 LOGO', h(Switch, { on: draft.logos.enabled, onChange: (next) => patch({ logos: { enabled: next } }) })),
             row('LOGO 位置', h(CornerPad, { value: draft.logos.corner, onChange: (id) => patch({ logos: { corner: id } }) })),
             sliderRow('LOGO 大小', draft.logos.size, 75, 225, (next) => patchLive({ logos: { size: next } }), (value) => `${value}px`, THEME_DEFAULTS.logos.size),
@@ -6438,8 +7230,13 @@ const VV_OPTIONS = [
               onChangePresets: setPresets,
               selectedId: activePreset ? activePreset.id : null,
               onSelect: setActivePreset,
+              exportRef: presetExportRef,
+              onToast: showExportToast,
             }));
         }
+
+        /* 2.9.0：全局菜单 —— 独立设置（不进预设、不进草稿）：总开关 / 5~8 / 九宫格摆位 / 功能池。 */
+        if (node === 'menu') return h(SuperMenuPane);
 
         if (node === 'hud/ui') {
           const currentScale = (draft.ui && draft.ui.scale) || '2k';
@@ -6490,7 +7287,7 @@ const VV_OPTIONS = [
               h('div', { className: 'dsh-bg-hint' }, '跟随模式：贴在输入框右侧、随输入框上下移动（右边栏打开时会自动让开）。'),
             ]),
             ...parallaxRows('widget'),
-            h('div', { className: 'dsh-bg-hint' }, '组件层跟随背景的缓慢漂移，视差强度 100% 是原来的幅度；关掉或者调到 0 就固定在摆放的位置上。组件的显隐 / 位置 / 缩放仍然用输入框旁那颗「组件编辑」按钮调。'));
+            h('div', { className: 'dsh-bg-hint' }, '组件层跟随背景的缓慢漂移，视差强度和 LOGO 层是同一套数值——同样 100% 时两层走的距离一样多。关掉或者调到 0 就固定在摆放的位置上。组件的显隐 / 位置 / 缩放仍然用输入框旁那颗「组件编辑」按钮调。'));
         }
 
         return null;
@@ -6638,6 +7435,27 @@ const VV_OPTIONS = [
                       : h('div', { className: 'dsh-bg-hint', style: { padding: '2px 10px' } }, '这个增强包还没有设置项。'))),
                 ),
               ),
+              h('div', {
+                className: 'dsh-menu-entry',
+                'data-active': node === 'menu' && !activePack ? '' : undefined,
+                role: 'button',
+                tabIndex: 0,
+                title: '全局菜单：右键在空白处按住 0.5 秒呼出',
+                onClick: () => {
+                  setPackId('base');
+                  setPackNode(null);
+                  setNode('menu');
+                },
+                onKeyDown: (event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  setPackId('base');
+                  setPackNode(null);
+                  setNode('menu');
+                },
+              },
+                h('span', { className: 'dsh-menu-entry-icon' }, superMenuGlyph(22)),
+                h('span', { className: 'dsh-menu-entry-label' }, '全局菜单')),
               packs.length ? h(PackSwitch, {
                 options: packOptions,
                 value: packId,
@@ -6669,13 +7487,24 @@ const VV_OPTIONS = [
                 ]
                 : [
                   node === 'presets' && activePreset && !activePreset.factory && !activePreset.builtin
-                    ? h('button', {
-                      key: 'delete-preset',
-                      type: 'button',
-                      className: 'dsh-bg-btn dsh-bg-btn-danger',
-                      title: '删除预设「' + activePreset.name + '」',
-                      onClick: () => requestDeletePreset(activePreset),
-                    }, '删除预设')
+                    ? h(React.Fragment, { key: 'preset-tools' },
+                      h('button', {
+                        key: 'delete-preset',
+                        type: 'button',
+                        className: 'dsh-bg-btn dsh-bg-btn-danger',
+                        title: '删除预设「' + activePreset.name + '」',
+                        onClick: () => requestDeletePreset(activePreset),
+                      }, '删除预设'),
+                      /* 2.8.1：导出预设代码——和取消按钮同一套样式，出现时机跟着删除按钮；
+                         点击后提示弹在这颗按钮上方，2 秒后消失 */
+                      h('span', { key: 'export-preset', className: 'dsh-bg-toast-wrap' },
+                        h('button', {
+                          type: 'button',
+                          className: 'dsh-bg-btn',
+                          title: '把「' + activePreset.name + '」导出成一段可粘贴的代码（含增强包状态）',
+                          onClick: () => { if (presetExportRef.current) presetExportRef.current(); },
+                        }, '导出代码'),
+                        exportToast ? h('span', { className: 'dsh-bg-toast', role: 'status' }, exportToast) : null))
                     : null,
                   draft.theme && accentHex(draft.theme.accent) !== accentNow
                     ? h('span', { key: 'accent-restart', className: 'dsh-bg-restart-hint' }, '主色将在重启 DSH 后生效')
@@ -7002,6 +7831,16 @@ const VV_OPTIONS = [
     function NotepadCard({ editing, minimized, onToggleMin, onMove }) {
       const [todos, setTodos] = React.useState([]);
       const [mode, setMode] = React.useState(() => (window.localStorage.getItem(NP_MODE_KEY) === 'todo' ? 'todo' : 'note'));
+      /* 2.9.0：超级全局菜单的「组件 → 记事本 → 笔记/待办」从外面切模式 */
+      React.useEffect(() => {
+        const onSetMode = (event) => {
+          const next = event && event.detail && event.detail.mode === 'todo' ? 'todo' : 'note';
+          setMode((previous) => (previous === next ? previous : next));
+          try { window.localStorage.setItem(NP_MODE_KEY, next); } catch (error) { /* ignore */ }
+        };
+        window.addEventListener('dsh-exv-notepad-mode', onSetMode);
+        return () => window.removeEventListener('dsh-exv-notepad-mode', onSetMode);
+      }, []);
       const [localEdit, setLocalEdit] = React.useState(false);
       const [draftId, setDraftId] = React.useState(null);
       const [fontSize, setFontSize] = React.useState(() => {
@@ -7902,6 +8741,1478 @@ const VV_OPTIONS = [
       );
     }
 
+    /* ==== 超级全局菜单（2.9.0 原型）=========================================
+       右键在空白处按住 0.5s：全屏 70% 黑蒙版淡入 → 鼠标处画 2px 方框
+       → 快速铺开 4 个母格（1 上 / 2 右 / 3 下 / 4 左）→ 顿一小下 →
+       5~8 用同一套「平移滑出」再铺一次（5 从 1 正右方 / 6 从 2 下方 /
+       7 从 3 正左方 / 8 从 4 正上方，全部是纯平移，没有旋转）。
+       母格边长 100px（2K 档）× 界面比例，格与格之间统一留 4px 空隙。
+       右键松开 / Esc / 失焦立即走退场动画。子格与功能绑定留到下一轮。 */
+    const SUPER_CELL_BASE = 100;
+    const SUPER_CELL_GAP = 4;
+    const SUPER_HOLD_MS = 500;
+    const SUPER_EXIT_MS = 240;
+    /* 两拍铺完（75~600ms）之后再允许悬停，否则格子还在中心时会被鼠标「抓」住高亮 */
+    const SUPER_READY_MS = 620;
+    /* 母格 1「图层开关」的子格：由近到远 = LOGO / 组件层 / 主人物 / 背景特效 / 格阵。
+       数组按「近 → 远」排，界面上越靠上越远。每个子格 = 母格横切成两半的长方形。 */
+    const SUPER_LAYERS = [
+      { id: 'logo', label: 'LOGO' },
+      { id: 'vv', label: '主人物', modes: [{ id: 'none', label: '无' }, { id: 'static', label: '静' }, { id: 'live2d', label: '动' }] },
+      { id: 'fx', label: '背景特效', modes: [{ id: 'rain', label: '代码' }, { id: 'meteor', label: '流星' }] },
+      { id: 'grid', label: '格阵' },
+    ];
+    /* 每个「功能」自己的名字：名字跟着功能走，不跟着母格走（第25棒起功能可以换格） */
+    const SUPER_FEATURE_LABELS = { layers: '图层', widgets: '组件', workspaces: '工作区', motions: '动作' };
+    /* 第24棒的原摆法，留作参照；SUPER_SLOT_FEATURES 才是真正生效的那张表 */
+    const SUPER_DEFAULT_SLOTS = { n: 'layers', e: 'widgets', s: 'workspaces', w: 'motions' };
+    /* 母格 → 功能。默认摆法（第24棒定的）：
+       1 图层（上）/ 2 组件（右）/ 3 工作区（下）/ 4 动作（左）。
+       「自定义摆位」就落在这张表上：换值 = 换摆位，几何 / 悬停 / 点击 / 留白都会跟着走。 */
+    const SUPER_SLOT_FEATURES = {
+      n: 'layers',
+      e: 'widgets',
+      s: 'workspaces',
+      w: 'motions',
+      ne: null,
+      se: null,
+      sw: null,
+      nw: null,
+    };
+    /* 每个母格的条往哪个方向铺：四个正位一眼能看出来，四个对角各挑自己象限的方向 */
+    const SUPER_SLOT_SIDES = {
+      n: 'top',
+      ne: 'right',
+      e: 'right',
+      se: 'bottom',
+      s: 'bottom',
+      sw: 'left',
+      w: 'left',
+      nw: 'top',
+    };
+    /* 2026-11-26（第26棒）：全局菜单的「总开关 / 5~8 / 摆位」是一份独立设置。
+       它不进主题配置（配置文件里没有这些字段）、不进预设（0.9 的规则只管配置字段）、
+       也不进面板底部的草稿——存在自己的 localStorage 键里，改完即时生效。
+       slots = 「母格 → 功能」；功能池里的每一项最多只能装在一个格子里。 */
+    const SUPER_MENU_KEY = 'dsh-exv-supermenu.v1';
+    /* 存盘格式版本：2.9.0 开发期第一次定型（总开关 / 第二批默认关 / 四个默认功能）。
+       旧格式（没有 v 字段）直接当「没设置过」处理，保证第一次打开就是出厂样式；
+       以后加功能不要再动这个数字，除非真的要做一次整体重置。 */
+    const SUPER_MENU_VERSION = 2;
+    const SUPER_MENU_SLOT_ORDER = ['n', 'e', 's', 'w', 'ne', 'se', 'sw', 'nw'];
+    const SUPER_MENU_SLOT_NUM = { n: '1', e: '2', s: '3', w: '4', ne: '5', se: '6', sw: '7', nw: '8' };
+    /* 可装配的功能池。现在只有这四项是真实可用的；
+       以后加功能 = 往这里加一条 + 在 superLayoutOf 的 features 里写它自己的行数据。 */
+    const SUPER_FEATURE_POOL = [
+      { id: 'layers', label: '图层', hint: '图层开关' },
+      { id: 'widgets', label: '组件', hint: '组件显隐与模式' },
+      { id: 'workspaces', label: '工作区', hint: '打开工作区' },
+      { id: 'motions', label: '动作', hint: '播放动作' },
+      { id: 'desktop', label: '桌面模式', hint: '开关桌面模式' },
+      { id: 'plan', label: '计划', hint: '插入 /plan' },
+      { id: 'goal', label: '目标', hint: '插入 /goal' },
+      { id: 'usage', label: '查询用量', hint: '打开用量页' },
+      { id: 'topup', label: '充值', hint: '打开充值页' },
+      { id: 'export', label: '下载日志', hint: '插入 /export' },
+      { id: 'path', label: '打开路径', hint: '打开自定义路径' },
+      { id: 'custom', label: '自定义', hint: '复制提示词交给 AI' },
+    ];
+    /* 功能图标：12×12、线宽 1.3、吃 currentColor。
+       第26棒定的口径：一律棱角（方框 / 45° / 直边），不用圆、不用圆角连接，
+       笔头也换成方形，和主题包的科幻 HUD 一致。设置页 15px，右键菜单放大到母格边长的 38%。 */
+    const superFeatureIcon = (id, px) => {
+      const common = {
+        viewBox: '0 0 12 12',
+        width: String(px),
+        height: String(px),
+        fill: 'none',
+        stroke: 'currentColor',
+        strokeWidth: '1.3',
+        strokeLinecap: 'square',
+        strokeLinejoin: 'miter',
+        'aria-hidden': 'true',
+      };
+      if (id === 'layers') return h('svg', common,
+        h('path', { d: 'M6 1.5 10.5 3.9 6 6.3 1.5 3.9Z' }),
+        h('path', { d: 'M1.5 6.5 6 8.9 10.5 6.5' }),
+        h('path', { d: 'M1.5 9.1 6 11.5 10.5 9.1' }));
+      if (id === 'widgets') return h('svg', common,
+        h('path', { d: 'M2 2h3.1v3.1H2zM6.9 2H10v3.1H6.9zM2 6.9h3.1V10H2zM6.9 6.9H10V10H6.9z' }));
+      if (id === 'workspaces') return h('svg', common,
+        h('path', { d: 'M1.6 3.2h3.3l1.1 1.3h4.4v5.3H1.6z' }));
+      /* 动作：方框 + 实心播放三角（原来是圆环） */
+      if (id === 'motions') return h('svg', common,
+        h('path', { d: 'M1.7 1.7h8.6v8.6H1.7z' }),
+        h('path', { d: 'M5 4.1 8.3 6 5 7.9Z', fill: 'currentColor', stroke: 'none' }));
+      if (id === 'desktop') return h('svg', common,
+        h('path', { d: 'M1.6 2.6h8.8v6.1H1.6z' }),
+        h('path', { d: 'M4.4 10.6h3.2M6 8.7v1.9' }));
+      if (id === 'plan') return h('svg', common,
+        h('path', { d: 'M1.8 2.9h8.4M1.8 5.8h8.4M1.8 8.7h4.6' }),
+        h('path', { d: 'M8.4 9.2 9.4 10.2 11.2 7.6' }));
+      /* 目标：双层菱形（45° 方框），不用同心圆 */
+      if (id === 'goal') return h('svg', common,
+        h('path', { d: 'M6 1.5 10.5 6 6 10.5 1.5 6Z' }),
+        h('path', { d: 'M6 4.1 7.9 6 6 7.9 4.1 6Z' }));
+      if (id === 'usage') return h('svg', common,
+        h('path', { d: 'M2.4 9.8V6.4M5.2 9.8V3.4M8 9.8V5.6M10.8 9.8V2.6' }),
+        h('path', { d: 'M1.4 10.9h9.2' }));
+      /* 充值：方框 + 加号（原来是圆环 + 加号） */
+      if (id === 'topup') return h('svg', common,
+        h('path', { d: 'M1.7 1.7h8.6v8.6H1.7z' }),
+        h('path', { d: 'M6 4v4M4 6h4' }));
+      /* 打开路径：文件夹 + 向外的小箭头 */
+      if (id === 'path') return h('svg', common,
+        h('path', { d: 'M1.6 3.4h3.1l1 1.2h4.7v5H1.6z' }),
+        h('path', { d: 'M7.4 9.2 10.4 6.2M8.4 6.2h2v2' }));
+      /* 下载日志：托盘 + 向下箭头 */
+      if (id === 'export') return h('svg', common,
+        h('path', { d: 'M2.1 8.1v2.2h7.8V8.1' }),
+        h('path', { d: 'M6 1.6v4.5M4.2 4.4 6 6.2 7.8 4.4' }));
+      /* 自定义：虚线方框 + 加号（虚线也是方的，不用圆点） */
+      if (id === 'custom') return h('svg', common,
+        h('path', { d: 'M1.7 1.7h8.6v8.6H1.7z', strokeDasharray: '2 1.5' }),
+        h('path', { d: 'M6 3.9v4.2M3.9 6h4.2' }));
+      /* 下载日志：托盘 + 向下箭头 */
+      if (id === 'export') return h('svg', common,
+        h('path', { d: 'M2.1 8.1v2.2h7.8V8.1' }),
+        h('path', { d: 'M6 1.6v4.5M4.2 4.4 6 6.2 7.8 4.4' }));
+      return h('svg', common, h('path', { d: 'M2.2 2.2h3v3h-3zM6.8 2.2h3v3h-3zM2.2 6.8h3v3h-3zM6.8 6.8h3v3h-3z' }));
+    };
+    /* 动作型功能：没有子格，点母格直接执行 */
+    const SUPER_ACTIONS = {
+      desktop: { label: () => (superDesktopOn() ? '退出桌面' : '桌面模式'), run: (origin) => superToggleDesktop(origin) },
+      plan: { label: () => '计划', run: () => {
+        const ok = superInsertComposerCommand('/plan ');
+        if (!ok) superToast('输入框不可用：先点进一个会话', 'bad');
+        return ok;
+      } },
+      goal: { label: () => '目标', run: () => {
+        const ok = superInsertComposerCommand('/goal ');
+        if (!ok) superToast('输入框不可用：先点进一个会话', 'bad');
+        return ok;
+      } },
+      usage: { label: () => '查询用量', run: () => superOpenPlatformPage('usage') },
+      topup: { label: () => '充值', run: () => superOpenPlatformPage('top_up') },
+      export: { label: () => '下载日志', run: () => {
+        const ok = superInsertComposerCommand('/export');
+        superToast(ok ? '已在输入框插入 /export，回车开始下载' : '输入框不可用：先点进一个会话', ok ? '' : 'bad');
+        return ok;
+      } },
+      custom: { label: () => '自定义', run: () => {
+        /* 复制这类动作绝不能把异常抛出去：一抛 superRunAction 就返回 false、菜单也不收，
+           表现成「点了没反应」。所以这里自己兜住，成败都用提示条说话。 */
+        try {
+          superCopyCustomPrompt();
+        } catch (error) {
+          superToast('复制失败：' + String((error && error.message) || error), 'bad');
+        }
+        return true;
+      } },
+    };
+    const superActionLabels = () => {
+      const out = {};
+      Object.keys(SUPER_ACTIONS).forEach((id) => { out[id] = SUPER_ACTIONS[id].label(); });
+      return out;
+    };
+    const superRunAction = (id, origin) => {
+      const action = SUPER_ACTIONS[id];
+      if (!action) return false;
+      try { action.run(origin); } catch (error) { return false; }
+      return true;
+    };
+    const superMenuDefaults = () => ({
+      on: true,
+      /* 第二批 5~8 默认关着：第一次打开只有 1~4，想用得自己去设置里开 */
+      second: false,
+      slots: {
+        n: SUPER_SLOT_FEATURES.n,
+        e: SUPER_SLOT_FEATURES.e,
+        s: SUPER_SLOT_FEATURES.s,
+        w: SUPER_SLOT_FEATURES.w,
+        ne: null,
+        se: null,
+        sw: null,
+        nw: null,
+      },
+      /* 可配置功能的实际内容：现在只有「打开路径」需要填（一级子格的名称 + 绝对路径） */
+      features: { path: { rows: [] } },
+    });
+    /* 功能配置的收口：名称限 12 字、最多 8 条、id 唯一。
+       注意这里是「存得下就存」——编辑途中名称/路径可能是空的，不能当场丢掉，
+       真正能不能用由 superPathRows() 过滤（名称非空 + 绝对路径）。 */
+    const SUPER_PATH_NAME_MAX = 12;
+    const SUPER_PATH_ROWS_MAX = 8;
+    const superPathIsAbsolute = (value) => typeof value === 'string'
+      && (/^[a-zA-Z]:[\\/]/.test(value) || /^\\\\[^\\]/.test(value) || value.charAt(0) === '/');
+    const sanitizeSuperPathRows = (value) => {
+      if (!Array.isArray(value)) return [];
+      const rows = [];
+      const seen = {};
+      value.forEach((item) => {
+        if (!item || typeof item !== 'object') return;
+        if (rows.length >= SUPER_PATH_ROWS_MAX) return;
+        const label = typeof item.label === 'string' ? item.label.slice(0, SUPER_PATH_NAME_MAX) : '';
+        const target = typeof item.path === 'string' ? item.path.slice(0, 1024) : '';
+        /* 空白行也要留住：使用者刚点「添加子格」还没填，不能当场丢掉 */
+        if (!Object.prototype.hasOwnProperty.call(item, 'label') && !Object.prototype.hasOwnProperty.call(item, 'path')) return;
+        let id = typeof item.id === 'string' ? item.id.trim() : '';
+        if (!id || seen[id]) id = 'p' + (rows.length + 1).toString(36) + Date.now().toString(36);
+        seen[id] = true;
+        rows.push({ id, label, path: target });
+      });
+      return rows;
+    };
+    /* 设置的内存副本：localStorage 写不进去时（配额满 / 隐私模式）也不能让「刚改完却读不到」
+       这种事发生——菜单和设置页都以这份为准，落盘只当持久化。 */
+    let SUPER_MENU_MEMORY = null;
+    let SUPER_MENU_PERSIST_OK = true;
+    /* 摆位的唯一收口：只认功能池里的 id、一个功能最多占一格、第二批关时对角一律清空 */
+    const sanitizeSuperSlots = (value, secondOn) => {
+      const out = { n: null, e: null, s: null, w: null, ne: null, se: null, sw: null, nw: null };
+      const used = {};
+      const source = value && typeof value === 'object' ? value : null;
+      if (source) {
+        SUPER_MENU_SLOT_ORDER.forEach((slot) => {
+          const id = source[slot];
+          if (typeof id !== 'string' || used[id]) return;
+          if (!SUPER_FEATURE_POOL.some((feature) => feature.id === id)) return;
+          used[id] = true;
+          out[slot] = id;
+        });
+      }
+      if (!secondOn) {
+        out.ne = null;
+        out.se = null;
+        out.sw = null;
+        out.nw = null;
+      }
+      return out;
+    };
+    const superMenuSettings = () => {
+      if (SUPER_MENU_MEMORY) return SUPER_MENU_MEMORY;
+      const fallback = superMenuDefaults();
+      let raw = null;
+      try { raw = JSON.parse(window.localStorage.getItem(SUPER_MENU_KEY) || 'null'); } catch (error) { raw = null; }
+      if (!raw || typeof raw !== 'object' || raw.v !== SUPER_MENU_VERSION) {
+        SUPER_MENU_MEMORY = fallback;
+        return fallback;
+      }
+      const out = {
+        on: raw.on !== false,
+        second: raw.second !== false,
+        slots: sanitizeSuperSlots(raw.slots, raw.second !== false),
+        features: { path: { rows: [] } },
+      };
+      const rawFeatures = raw.features && typeof raw.features === 'object' ? raw.features : null;
+      if (rawFeatures && rawFeatures.path && typeof rawFeatures.path === 'object') {
+        out.features.path.rows = sanitizeSuperPathRows(rawFeatures.path.rows);
+      }
+      SUPER_MENU_MEMORY = out;
+      return out;
+    };
+    const superMenuPatch = (patch) => {
+      const base = superMenuSettings();
+      const next = {
+        v: SUPER_MENU_VERSION,
+        on: patch && patch.on !== undefined ? patch.on !== false : base.on,
+        second: patch && patch.second !== undefined ? patch.second !== false : base.second,
+        slots: sanitizeSuperSlots(
+          patch && patch.slots ? patch.slots : base.slots,
+          patch && patch.second !== undefined ? patch.second !== false : base.second,
+        ),
+        features: { path: { rows: base.features.path.rows.slice() } },
+      };
+      if (patch && patch.features && patch.features.path) {
+        next.features.path.rows = sanitizeSuperPathRows(patch.features.path.rows);
+      }
+      SUPER_MENU_MEMORY = next;
+      SUPER_MENU_PERSIST_OK = true;
+      try { window.localStorage.setItem(SUPER_MENU_KEY, JSON.stringify(next)); } catch (error) { SUPER_MENU_PERSIST_OK = false; }
+      try { window.dispatchEvent(new CustomEvent('dsh-exv-supermenu')); } catch (error) { /* ignore */ }
+      return next;
+    };
+    const superMenuPersistOk = () => SUPER_MENU_PERSIST_OK;
+    const superMenuSlots = () => superMenuSettings().slots;
+    /* 菜单里真正能用的行：名称非空 + 绝对路径 */
+    const superPathRows = () => superMenuSettings().features.path.rows
+      .filter((row) => row.label.trim() && superPathIsAbsolute(row.path.trim()))
+      .map((row) => ({ id: row.id, label: row.label.trim().slice(0, SUPER_PATH_NAME_MAX), path: row.path.trim() }));
+    /* 桌面模式：三小只那颗按钮和超级菜单的母格走同一条路（window.__DSH_EXV_TOOLS__） */
+    const superDesktopOn = () => {
+      try {
+        const api = window.__DSH_EXV_TOOLS__;
+        return !!(api && typeof api.desktop === 'function' && api.desktop());
+      } catch (error) { return false; }
+    };
+    const superToggleDesktop = (origin) => {
+      try {
+        const api = window.__DSH_EXV_TOOLS__;
+        if (!api || typeof api.toggleDesktop !== 'function') return false;
+        api.toggleDesktop(origin);
+        return true;
+      } catch (error) { return false; }
+    };
+    /* 「计划 / 目标」= 宿主自己的 /plan、/goal 指令。输入框左下角那颗 + 里的两项就是往
+       composer 里插入指令文本，这里照做（插在开头，插完光标就在指令后面，直接接着写）。 */
+    const superInsertComposerCommand = (text) => {
+      try {
+        const editor = typeof composerEditorElement === 'function' ? composerEditorElement() : null;
+        if (!editor) return false;
+        editor.focus();
+        if (editor.tagName === 'TEXTAREA') {
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+          setter.call(editor, text + (editor.value || ''));
+          editor.dispatchEvent(new Event('input', { bubbles: true }));
+          return true;
+        }
+        const selection = window.getSelection();
+        if (selection) {
+          const range = document.createRange();
+          range.selectNodeContents(editor);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        }
+        return document.execCommand('insertText', false, text);
+      } catch (error) {
+        return false;
+      }
+    };
+    /* 「查询用量 / 充值」= 设置 → 账户里的两个入口，都是开平台网页：
+       宿主账户服务里就是 new URL('/usage' | '/top_up', 'https://platform.deepseek.com')。
+       这里用和设置页一样的 <a target=_blank rel=noopener> 真点一下，让桌面端自己的
+       外链处理接管（直接 window.open 在 Electron 里未必走同一条路）。 */
+    const superOpenPlatformPage = (page) => {
+      const url = 'https://platform.deepseek.com/' + page;
+      try {
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.target = '_blank';
+        anchor.rel = 'noopener noreferrer';
+        anchor.style.display = 'none';
+        document.body.appendChild(anchor);
+        anchor.click();
+        window.setTimeout(() => { try { anchor.remove(); } catch (error) { /* ignore */ } }, 0);
+        return true;
+      } catch (error) { return false; }
+    };
+    /* 动作类功能多数「看不见结果」（复制剪贴板、插指令、开路径），收完菜单给一句反馈，
+       别让人以为没反应。样式见 .dsh-super-toast，1.8s 后自己淡出。 */
+    const superToast = (text, tone) => {
+      if (!text) return false;
+      try {
+        const node = document.createElement('div');
+        node.className = 'dsh-super-toast';
+        if (tone === 'bad') node.setAttribute('data-bad', '');
+        node.textContent = text;
+        document.body.appendChild(node);
+        window.requestAnimationFrame(() => { try { node.setAttribute('data-in', ''); } catch (error) { /* ignore */ } });
+        window.setTimeout(() => {
+          try { node.removeAttribute('data-in'); } catch (error) { /* ignore */ }
+          window.setTimeout(() => { try { node.remove(); } catch (error) { /* ignore */ } }, 240);
+        }, 1800);
+        return true;
+      } catch (error) { return false; }
+    };
+    /* 「打开路径」：内容由使用者在设置 → 全局菜单 → 功能配置里自己填，
+       走宿主的 /dsh-exv-open-path（只接受绝对路径 + 必须真实存在）。 */
+    const superOpenPath = (target) => {
+      if (!target) return false;
+      try {
+        fetch('/dsh-exv-open-path', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path: target }),
+        }).then((response) => {
+          if (response.ok) return;
+          superToast(response.status === 404 ? '打不开：这个路径不存在' : '打不开：路径无效', 'bad');
+        }).catch(() => { superToast('打不开：宿主没有响应（改过 index.js 要完全重启 DSH）', 'bad'); });
+        return true;
+      } catch (error) { return false; }
+    };
+    /* 「自定义」：一键把这段提示词塞进剪贴板。使用者在新会话里粘上去，
+       那边的 AI 没有任何交接文档，全靠这段字自己找锚点、按规范加功能。 */
+    const SUPER_CUSTOM_PROMPT = String.raw`你是 DeepSeek Harness（DSH）的编码助手。用户装了 DSH EXV Theme 2.9.0 主题包，想给它的「超级全局菜单」新增一个功能。你手上没有任何交接文档，下面是你需要的全部背景，按它做即可，不要从头翻整个项目。
+
+【主题包在哪】
+- 界面代码全在单文件：%USERPROFILE%\.dsh\plugins\cyan-theme\client.js（约 2.7MB，DSH 直接读它，改完用户按 Ctrl+R 生效）
+- 需要「本机能力」（打开文件夹、执行系统命令）时才改宿主半边：%USERPROFILE%\.dsh\plugins\cyan-theme\index.js（改完必须完全退出 DSH 再打开）
+- 不要动 C:\Github_Local 下的仓库，不要发 npm，不要改版本号。
+
+【超级菜单现状（2.9.0 已完工）】
+右键在界面空白处按住 0.5 秒呼出：中间一个焦点框，四周 8 个「母格」。
+母格分两种：
+- 动作型：点一下直接执行（桌面模式 / 计划 / 目标 / 查询用量 / 充值 / 下载日志 / 自定义）
+- 带子格型：悬停向外展开一排「一级子格」，子格还能再展开「二级方格」（图层 / 组件 / 工作区 / 动作 / 打开路径）
+设置面板：背景编辑 → 全局菜单。里面是 总开关、第二批 5~8 开关、九宫格摆位（拖动装配）、功能池、功能配置（给「打开路径」编一级子格）。
+菜单的设置完全独立：不进主题配置（THEME_DEFAULTS / themeNormalize）、不进预设、不参与底部「保存 / 应用」草稿，只存在 localStorage 的 dsh-exv-supermenu.v1。
+
+【加功能前先读这几段（用搜索定位，各读上下 60 行就够）】
+1. const SUPER_FEATURE_POOL = [    功能池清单，每项 { id, label, hint }
+2. const superFeatureIcon = (id, px) => {    功能图标：12×12 viewBox、线宽 1.3、只用直角 / 方框 / 45°，不要圆形，颜色用 currentColor
+3. const SUPER_ACTIONS = {    动作型功能表，每项 { label: () => '名字', run: (origin) => { ... } }；这张表的 key 会自动变成母格，不用另外登记
+4. const superLayoutOf = (menu, data) => { 里的 const features = {    带子格的功能必须在这里登记，否则菜单里会变成空白格
+5. function SuperMenuPane() {    设置页（总开关 / 第二批 / 九宫格 / 功能池 / 功能配置）
+6. const superMenuSettings 与 const superMenuPatch    独立设置存储（含 sanitizeSuperSlots / sanitizeSuperPathRows 两个收口）
+7. 搜索 data-super-path 和 onOverlayDown    菜单里的点击分发
+8. const superToast =    动作做完的提示条（结果看不见的动作一定要给一句反馈）
+
+【形态 A：动作型，三步（新功能优先做这个）】
+1) SUPER_FEATURE_POOL 里加 { id: 'xxx', label: '中文名', hint: '一句话说明' }
+2) superFeatureIcon 里加 if (id === 'xxx') return h('svg', common, ...)（直角线稿图标）
+3) SUPER_ACTIONS 里加 xxx: { label: () => '中文名', run: (origin) => { 你要做的事 } }
+做完就能用：母格按 SUPER_ACTIONS 自动生成，设置页会自动出现这个方块，拖进九宫格即可。
+如果结果看不见（复制、下载、改系统状态），run 里用 superToast('做完了') 给一句反馈，失败时 superToast('原因', 'bad')。
+
+【形态 B：带子格型，四步】
+1) 同形态 A 的第 1、2 步
+2) superLayoutOf 的 features 里登记：
+   xxx: { kind: 'xxx', label: '中文名', rowW: size, rowH: barH, available: true, rows: 你的行数组 }
+   行数组每项形如 { id, label, path?, modes? }；rows 为空时母格自动显示成不可用（警戒线）
+   注意：这一步漏了，功能池里能看到、也能拖进格子，但菜单里那一格是空白的（2.9.0 踩过两次）
+3) 点击：onOverlayDown 里已有一级子格 / 二级方格的通用处理，新类型照 data-super-* 的写法加分支
+4) 需要使用者配置内容时，在 SuperMenuPane 的「功能配置」区加一项（现成例子是「打开路径」）
+
+【必须守的规则】
+- 不要改已有功能的 id、不要删别人的代码；新增设置字段要在 superMenuSettings / superMenuPatch 里做兼容（缺字段补默认值），并保持 sanitizeSuperSlots / sanitizeSuperPathRows 的收口
+- 图标只用直角：方框、45° 斜线、直边；不要 circle、不要圆角连接
+- 用户可见文案用中文
+- 改完必须 node --check 那个 client.js（用 DSH 自带 runtime 里的 node）
+- 需要本机能力时：在 index.js 里用 ctx.webServer.register({ kind: 'exact', path: '/dsh-exv-xxx', handler }) 加本地路由，客户端 fetch 调用；路由必须校验输入（绝对路径 / 存在 / 长度），绝不要拼接或执行任意 shell 字符串
+- 如果机器上存在 C:\DSH Workload\_work，可以顺手跑这几个回归：_check-supermenu-coverage.cjs（池子里每个功能都要能解析出母格）、_check-super-hover.cjs、_check-supermenu-store.cjs、_tool\stability-check.cjs
+
+【交付时告诉用户】
+按 Ctrl+R 生效（改了 index.js 要完全退出 DSH 再打开）；然后到 背景编辑 → 全局菜单，把新功能拖进九宫格试。
+
+现在请先向用户确认三件事（一次问完）：功能叫什么名字、点下去要发生什么、有没有需要用户自己配置的内容。确认后按形态 A 或 B 实现。`;
+    const superCopyCustomPrompt = () => {
+      /* 复制本身看不见结果，所以成败都用提示条回一句；失败时把原因说清楚 */
+      writeClipboard(SUPER_CUSTOM_PROMPT).then((ok) => {
+        superToast(ok ? '提示词已复制，粘到新会话里就能开工' : '复制失败：剪贴板不可用', ok ? '' : 'bad');
+      }).catch(() => { superToast('复制失败：剪贴板不可用', 'bad'); });
+      return true;
+    };
+    /* 「动作」母格：这三类 kind 正是偷瞄池里的待机变体，不列出来 */
+    const SUPER_MOTION_SKIP_KINDS = ['wait', 'short-idle', 'repeat'];
+    const SUPER_MOTION_KIND_LABELS = {
+      idle: '待机', entrance: '入场', touch: '互动', wedding: '婚纱',
+      shake: '摇晃', broken: '故障', other: '其他',
+    };
+    const SUPER_MOTION_ROW_W = 200;
+    const SUPER_MOTION_ROW_H = 28;
+    const SUPER_MOTION_ROW_GAP = 4;
+    /* 关掉时记住的东西：主人物（模式 + 角色）。再次打开时回到关掉之前的角色，而不是回默认 VV。 */
+    let SUPER_LAST_VV = null;
+
+    const superStore = () => {
+      try {
+        return window.__DSH_EXV__ && typeof window.__DSH_EXV__.get === 'function' ? window.__DSH_EXV__ : null;
+      } catch (error) { return null; }
+    };
+    const superConfig = () => {
+      const store = superStore();
+      try { return (store && store.get()) || {}; } catch (error) { return {}; }
+    };
+    const superWidgets = () => {
+      try { return window.__DSH_EXV_WIDGETS__ || null; } catch (error) { return null; }
+    };
+    const superComponents = () => {
+      const api = superWidgets();
+      try {
+        return api && typeof api.components === 'function' ? api.components() : [];
+      } catch (error) { return []; }
+    };
+    const superToggleComponent = (id) => {
+      const api = superWidgets();
+      try {
+        return !!(api && typeof api.toggleComponent === 'function' && api.toggleComponent(id));
+      } catch (error) { return false; }
+    };
+    /* 「动作」母格的数据：parallax 的 __DSH_EXV_LIVE2D_MOTIONS__.all() 给当前模型全部动作，
+       这里按 kind 去掉偷瞄池里的待机变体（wait_* / *_short / repeat）。 */
+    const superMotions = () => {
+      try {
+        const api = window.__DSH_EXV_LIVE2D_MOTIONS__;
+        if (!api || typeof api.all !== 'function') return [];
+        const list = api.all();
+        if (!Array.isArray(list)) return [];
+        return list.filter((item) => item && item.name && SUPER_MOTION_SKIP_KINDS.indexOf(item.kind) < 0);
+      } catch (error) { return []; }
+    };
+    const superPlayMotion = (name) => {
+      try {
+        const api = window.__DSH_EXV_LIVE2D_MOTIONS__;
+        if (!api || typeof api.play !== 'function' || !name) return;
+        const result = api.play(name);
+        if (result && typeof result.catch === 'function') result.catch(() => { /* 播不了就算了 */ });
+      } catch (error) { /* ignore */ }
+    };
+    /* 「工作区」母格的数据：宿主半边 /dsh-exv-workspaces 直接读 durable 注册表 */
+    const superRefreshWorkspaces = () => fetch('/dsh-exv-workspaces', { credentials: 'same-origin', cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => (data && Array.isArray(data.items) ? data.items : null));
+    const superOpenWorkspace = (path) => {
+      if (!path) return;
+      try {
+        fetch('/dsh-exv-open-workspace', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ path }),
+        }).catch(() => { /* ignore */ });
+      } catch (error) { /* ignore */ }
+    };
+    const superSetComponentMode = (id, mode) => {
+      const api = superWidgets();
+      try {
+        return !!(api && typeof api.setComponentMode === 'function' && api.setComponentMode(id, mode));
+      } catch (error) { return false; }
+    };
+    const superLayerOn = (id, cfg) => {
+      try {
+        if (id === 'grid') return !(cfg.rain && cfg.rain.grid === false);
+        if (id === 'fx') return !(cfg.rain && cfg.rain.enabled === false);
+        if (id === 'logo') return !(cfg.logos && cfg.logos.enabled === false);
+        if (id === 'vv') return !!(cfg.vv && cfg.vv.mode && cfg.vv.mode !== 'none');
+      } catch (error) { /* ignore */ }
+      return false;
+    };
+    /* 一级子格上的二级方格：单选 */
+    const superLayerModeOn = (layer, modeId, cfg) => {
+      try {
+        if (layer === 'fx') return (((cfg.rain && cfg.rain.effect) || 'rain') === modeId);
+        if (layer === 'vv') return (((cfg.vv && cfg.vv.mode) || 'none') === modeId);
+      } catch (error) { /* ignore */ }
+      return false;
+    };
+    const superLayerSelectMode = (layer, modeId) => {
+      const store = superStore();
+      if (!store || typeof store.patch !== 'function') return false;
+      try {
+        if (layer === 'fx') store.patch({ rain: { effect: modeId } });
+        else if (layer === 'vv') store.patch({ vv: { mode: modeId } });
+        else return false;
+      } catch (error) { return false; }
+      return true;
+    };
+    const superToggleLayer = (id) => {
+      const store = superStore();
+      if (!store || typeof store.patch !== 'function') return false;
+      const cfg = superConfig();
+      const on = superLayerOn(id, cfg);
+      try {
+        if (id === 'grid') {
+          store.patch({ rain: { grid: !on } });
+        } else if (id === 'fx') {
+          /* 代码雨 / 流星雨共用 rain.enabled，跟着当前特效类型走 */
+          store.patch({ rain: { enabled: !on } });
+        } else if (id === 'logo') {
+          store.patch({ logos: { enabled: !on } });
+        } else if (id === 'vv') {
+          if (on) {
+            SUPER_LAST_VV = {
+              mode: (cfg.vv && cfg.vv.mode) || 'static',
+              preset: cfg.vv && cfg.vv.preset,
+              live2d: cfg.vv && cfg.vv.live2d,
+            };
+            store.patch({ vv: { mode: 'none' } });
+          } else if (SUPER_LAST_VV && SUPER_LAST_VV.mode && SUPER_LAST_VV.mode !== 'none'
+            && cfg.vv && cfg.vv.preset === SUPER_LAST_VV.preset && cfg.vv.live2d === SUPER_LAST_VV.live2d) {
+            /* 只在「角色设定没被别的预设改过」时才回到关之前的那个；改过就按预设当选的状态处理 */
+            store.patch({
+              vv: {
+                mode: SUPER_LAST_VV.mode,
+                preset: SUPER_LAST_VV.preset,
+                live2d: SUPER_LAST_VV.live2d,
+              },
+            });
+          } else {
+            store.patch({ vv: { mode: 'static', preset: (VV_OPTIONS[0] && VV_OPTIONS[0].id) || 'vv' } });
+          }
+        } else {
+          return false;
+        }
+      } catch (error) {
+        return false;
+      }
+      return true;
+    };
+    const SUPER_BLANK_SKIP = [
+      'input', 'textarea', 'select', 'button', 'a',
+      '[contenteditable="true"]', '[role="button"]', '[role="textbox"]', '[role="menu"]', '[role="dialog"]',
+      '.dsh-widget', '.dsh-tools', '.dsh-bg-panel', '.dsh-bg-overlay',
+      '.dsh-super-overlay', '.dsh-preset-form', '.dsh-widget-list',
+    ].join(',');
+    const SUPER_CELLS = [
+      { id: 'n', label: '1', dx: 0, dy: -1 },
+      { id: 'e', label: '2', dx: 1, dy: 0 },
+      { id: 's', label: '3', dx: 0, dy: 1 },
+      { id: 'w', label: '4', dx: -1, dy: 0 },
+      /* 后四个从各自顺时针相邻的母格滑出：5 从 1、6 从 2、7 从 3、8 从 4 */
+      { id: 'ne', label: '5', dx: 1, dy: -1, from: [0, -1] },
+      { id: 'se', label: '6', dx: 1, dy: 1, from: [1, 0] },
+      { id: 'sw', label: '7', dx: -1, dy: 1, from: [0, 1] },
+      { id: 'nw', label: '8', dx: -1, dy: -1, from: [-1, 0] },
+    ];
+    /* 超级菜单的几何：母格、四条一级子格、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份（两边不许再各算一套）。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    /* 超级菜单的几何：母格、每个功能的条、二级方格行的全部矩形都在这里算，
+       渲染和 pointermove 的悬停判定共用同一份。第25棒起「功能」和「母格位置」解耦：
+       SUPER_SLOT_FEATURES 决定哪个功能摆在哪一格，条的朝向由 SUPER_SLOT_SIDES 决定，
+       所以换摆位只需要改那张表，几何、悬停、点击、留白会一起跟着走。 */
+    const superLayoutOf = (menu, data) => {
+      const source = data || {};
+      const workspaces = source.workspaces || [];
+      const motions = source.motions || [];
+      const components = source.components || [];
+      const vvMode = source.vvMode || 'none';
+      const openStrip = source.openStrip || null;
+      const openChild = source.openChild || null;
+      /* 第26棒：摆位与 5~8 的开关变成独立设置（dsh-exv-supermenu.v1）。
+         布局只认传进来的那份 slots，缺参数时回落到默认摆法，测试脚本照旧能单跑。 */
+      const slots = source.slots || SUPER_SLOT_FEATURES;
+      const second = source.second !== false;
+      const actionLabels = source.actionLabels || {};
+      /* 动作型功能没有子格，点母格直接执行；名字由调用方给（桌面模式会随状态变）。
+         动作清单也从调用方来（= SUPER_ACTIONS 的 key），这样新增动作功能不用再改这里。 */
+      const actionIds = Array.isArray(source.actionIds) ? source.actionIds : ['desktop'];
+      const actionFeature = (id) => ({ kind: 'action', label: actionLabels[id] || id, rowW: size, rowH: Math.round(size / 2), available: true, rows: [] });
+      const cellList = second ? SUPER_CELLS : SUPER_CELLS.filter((cell) => !cell.from);
+      const size = menu.size;
+      const gap = SUPER_CELL_GAP;
+      const step = size + gap;
+      const barH = Math.round(size / 2);
+      const modeSquare = barH;
+      const originLeft = menu.x - size / 2;
+      const originTop = menu.y - size / 2;
+      const box = (left, top, width, height) => ({ left, top, width, height });
+      const cells = {};
+      cellList.forEach((cell) => {
+        cells[cell.id] = box(originLeft + cell.dx * step, originTop + cell.dy * step, size, size);
+      });
+
+      /* ---- 每个功能自己的行数据（与摆在哪一格无关） ---- */
+      const layerRows = SUPER_LAYERS.map((layer) => ({
+        id: layer.id,
+        label: layer.label,
+        modes: Array.isArray(layer.modes) && layer.modes.length > 0 ? layer.modes : null,
+      }));
+      const widgetRows = components.map((component) => ({
+        id: component.id,
+        label: component.label,
+        modes: Array.isArray(component.modes) && component.modes.length > 0 ? component.modes : null,
+        on: component.on,
+        mode: component.mode,
+      }));
+      const workspaceRows = workspaces.length > 1 ? workspaces.map((workspace) => ({
+        id: 'ws-' + (workspace.id || workspace.path),
+        label: workspace.title || workspace.path,
+        title: workspace.path || '',
+        workspace,
+      })) : [];
+      /* 「打开路径」的行由使用者在设置里配置（名称 + 绝对路径），这里是最后一次过滤后的快照 */
+      const pathRows = (source.pathRows || []).map((row) => ({
+        id: 'pt-' + row.id,
+        label: row.label,
+        title: row.path,
+        path: row.path,
+      }));
+      const motionRows = motions.map((motion) => ({
+        id: 'mo-' + motion.name,
+        label: String(motion.name || '').replace(/\.motion3\.json$/i, ''),
+        tag: SUPER_MOTION_KIND_LABELS[motion.kind] || SUPER_MOTION_KIND_LABELS.other,
+        title: motion.name + (motion.duration ? '（' + Number(motion.duration).toFixed(1) + 's）' : ''),
+        motion,
+      }));
+
+      const features = {
+        layers: { kind: 'layer', label: SUPER_FEATURE_LABELS.layers, rowW: size, rowH: barH, available: true, rows: layerRows },
+        widgets: { kind: 'widget', label: SUPER_FEATURE_LABELS.widgets, rowW: size, rowH: barH, available: components.length > 0, rows: widgetRows },
+        workspaces: { kind: 'workspace', label: SUPER_FEATURE_LABELS.workspaces, rowW: size, rowH: barH, available: workspaces.length > 0, rows: workspaceRows },
+        motions: { kind: 'motion', label: SUPER_FEATURE_LABELS.motions, rowW: SUPER_MOTION_ROW_W, rowH: SUPER_MOTION_ROW_H, available: vvMode === 'live2d' && motions.length > 0, rows: motionRows },
+        /* 打开路径：行由使用者自己配，没配就整格显示成不可用（警戒线） */
+        path: { kind: 'path', label: '打开路径', rowW: size, rowH: barH, available: pathRows.length > 0, rows: pathRows },
+      };
+      /* 动作型功能按清单一次补齐（清单 = SUPER_ACTIONS 的 key）：
+         少写一个就会让那一格在菜单里变成空格子——所以不再逐个手写。 */
+      actionIds.forEach((id) => {
+        if (!features[id]) features[id] = actionFeature(id);
+      });
+
+      /* ---- 母格 → 功能：条按母格的朝向铺出去 ---- */
+      const strips = [];
+      const slotFeatures = {};
+      cellList.forEach((cell) => {
+        const featureId = slots[cell.id];
+        const feature = featureId ? features[featureId] : null;
+        slotFeatures[cell.id] = feature ? featureId : null;
+        if (!feature) return;
+        const side = SUPER_SLOT_SIDES[cell.id] || 'right';
+        const cellRect = cells[cell.id];
+        const rows = feature.rows || [];
+        const usable = Boolean(feature.available) && rows.length > 0;
+        let stripBox = null;
+        const laidRows = [];
+        if (usable) {
+          const rowW = feature.rowW;
+          const rowH = feature.rowH;
+          const totalH = rows.length * rowH + (rows.length - 1) * gap;
+          if (side === 'top') stripBox = box(cellRect.left, cellRect.top - gap - totalH, rowW, totalH);
+          else if (side === 'bottom') stripBox = box(cellRect.left, cellRect.top + cellRect.height + gap, rowW, totalH);
+          else if (side === 'right') stripBox = box(cellRect.left + cellRect.width + gap, cellRect.top, rowW, totalH);
+          else stripBox = box(cellRect.left - gap - rowW, cellRect.top + (cellRect.height - totalH) / 2, rowW, totalH);
+          /* 纵向排列：top 的条从下往上（第 0 条贴着母格），其余方向从上往下 */
+          rows.forEach((row, index) => {
+            const top = side === 'top'
+              ? stripBox.top + totalH - (index + 1) * rowH - index * gap
+              : stripBox.top + index * (rowH + gap);
+            const rect = box(stripBox.left, top, rowW, rowH);
+            const rowSide = side === 'left' ? 'left' : 'right';
+            let rowRect = null;
+            if (row.modes) {
+              const modesW = row.modes.length * modeSquare + (row.modes.length - 1) * gap;
+              rowRect = rowSide === 'left'
+                ? box(rect.left - gap - modesW, rect.top, modesW, modeSquare)
+                : box(rect.left + rowW + gap, rect.top, modesW, modeSquare);
+            }
+            laidRows.push({
+              id: row.id,
+              label: row.label,
+              title: row.title,
+              tag: row.tag,
+              modes: row.modes || null,
+              on: row.on,
+              mode: row.mode,
+              workspace: row.workspace,
+              motion: row.motion,
+              rect,
+              rowRect,
+              rowSide,
+              ly: (cellRect.top + cellRect.height / 2) - (top + rowH / 2),
+            });
+          });
+        }
+        strips.push({
+          id: featureId,
+          kind: feature.kind,
+          label: feature.label,
+          cell: cell.id,
+          side,
+          available: Boolean(feature.available),
+          box: stripBox,
+          rows: laidRows,
+        });
+      });
+
+      const mothers = {};
+      strips.forEach((strip) => {
+        mothers[strip.cell] = { label: strip.label, available: strip.available, strip };
+      });
+
+      /* 留白：所有可用的条（含二级方格）都算进去，摆位换了也不用重算 pad */
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+      const grow = (rect) => {
+        minX = Math.min(minX, rect.left);
+        minY = Math.min(minY, rect.top);
+        maxX = Math.max(maxX, rect.left + rect.width);
+        maxY = Math.max(maxY, rect.top + rect.height);
+      };
+      Object.keys(cells).forEach((id) => grow(cells[id]));
+      strips.forEach((strip) => {
+        if (!strip.box) return;
+        grow(strip.box);
+        strip.rows.forEach((row) => { if (row.rowRect) grow(row.rowRect); });
+      });
+      const needs = {
+        left: menu.x - minX,
+        right: maxX - menu.x,
+        top: menu.y - minY,
+        bottom: maxY - menu.y,
+      };
+
+      /* 「点缝隙 = 不退出」的外框：网格 + 当前展开的那条 + 它展开的二级方格 */
+      let fpMinX = Infinity;
+      let fpMinY = Infinity;
+      let fpMaxX = -Infinity;
+      let fpMaxY = -Infinity;
+      const fpGrow = (rect) => {
+        fpMinX = Math.min(fpMinX, rect.left);
+        fpMinY = Math.min(fpMinY, rect.top);
+        fpMaxX = Math.max(fpMaxX, rect.left + rect.width);
+        fpMaxY = Math.max(fpMaxY, rect.top + rect.height);
+      };
+      Object.keys(cells).forEach((id) => fpGrow(cells[id]));
+      strips.forEach((strip) => {
+        if (!strip.box || openStrip !== strip.id) return;
+        fpGrow(strip.box);
+        strip.rows.forEach((row) => { if (row.rowRect && openChild === row.id) fpGrow(row.rowRect); });
+      });
+      const footprint = { left: fpMinX - gap, top: fpMinY - gap, right: fpMaxX + gap, bottom: fpMaxY + gap };
+
+      return {
+        size,
+        gap,
+        step,
+        barH,
+        square: modeSquare,
+        originLeft,
+        originTop,
+        cells,
+        cellList,
+        strips,
+        mothers,
+        slotFeatures,
+        needs,
+        footprint,
+      };
+    };
+
+    function SuperMenu() {
+      /* menu 保留最后一次的坐标：节点常驻 body（避免每次开菜单都往 body 里插新节点——
+         vv 报的「蒙版闪一下」就是插入时视觉包的色差滤镜重新挂载造成的） */
+      const [menu, setMenu] = React.useState(null);
+      const [phase, setPhase] = React.useState('idle'); /* idle | in | out */
+      const [readyStage, setReadyStage] = React.useState(0); /* 0 未就绪 / 1 母格 1~4 / 2 全部 */
+      const [openStrip, setOpenStrip] = React.useState(null); /* layers | widgets | workspaces | motions */
+      const [openChild, setOpenChild] = React.useState(null); /* 展开二级方格的父级 id */
+      const [workspaces, setWorkspaces] = React.useState([]);
+      const [motions, setMotions] = React.useState(() => superMotions());
+      const [, setTick] = React.useState(0);
+      const phaseRef = React.useRef('idle');
+      const openRef = React.useRef(false);
+      const suppressRef = React.useRef(0);
+      const exitTimer = React.useRef(0);
+      const readyTimer = React.useRef(0);
+      const readyTimer2 = React.useRef(0);
+      const stripTimer = React.useRef(0);
+      const childTimer = React.useRef(0);
+      const rafRef = React.useRef(0);
+      /* 渲染时同步的这些 ref：pointermove 里要读最新的几何 / 状态，但监听只挂一次 */
+      const menuRef = React.useRef(null);
+      menuRef.current = menu;
+      const openStripRef = React.useRef(null);
+      openStripRef.current = openStrip;
+      const openChildRef = React.useRef(null);
+      openChildRef.current = openChild;
+      const layoutRef = React.useRef(null);
+      const workspacesRef = React.useRef(workspaces);
+      workspacesRef.current = workspaces;
+      const motionsRef = React.useRef(motions);
+      motionsRef.current = motions;
+
+      const setPhaseSafe = (next) => {
+        phaseRef.current = next;
+        setPhase(next);
+      };
+
+      const closeMenu = () => {
+        if (!openRef.current || phaseRef.current === 'out') return;
+        setPhaseSafe('out');
+        setReadyStage(0);
+        setOpenStrip(null);
+        setOpenChild(null);
+        openStripRef.current = null;
+        openChildRef.current = null;
+        window.clearTimeout(readyTimer.current);
+        window.clearTimeout(readyTimer2.current);
+        window.clearTimeout(stripTimer.current);
+        window.clearTimeout(childTimer.current);
+        /* 收起后立刻会来一次 contextmenu（Windows 上是右键抬起时触发），压掉它 */
+        suppressRef.current = Date.now() + 400;
+        window.clearTimeout(exitTimer.current);
+        exitTimer.current = window.setTimeout(() => {
+          openRef.current = false;
+          setPhaseSafe('idle');
+        }, SUPER_EXIT_MS);
+      };
+
+      const storeApi = () => {
+        try {
+          return window.__DSH_EXV__ && typeof window.__DSH_EXV__.get === 'function' ? window.__DSH_EXV__ : null;
+        } catch (error) { return null; }
+      };
+      const currentConfig = () => {
+        const store = storeApi();
+        try { return (store && store.get()) || {}; } catch (error) { return {}; }
+      };
+
+      /* 一级子格：图层 / 组件的开关 */
+      const toggleLayer = (id) => {
+        if (superToggleLayer(id)) setTick((value) => value + 1);
+      };
+
+      const setStripNow = (value) => {
+        if (openStripRef.current === value) return;
+        openStripRef.current = value;
+        setOpenStrip(value);
+      };
+      const setChildNow = (value) => {
+        if (openChildRef.current === value) return;
+        openChildRef.current = value;
+        setOpenChild(value);
+      };
+      const openStripNow = (id) => {
+        window.clearTimeout(stripTimer.current);
+        window.clearTimeout(childTimer.current);
+        setStripNow(id);
+        setChildNow(null);
+      };
+      const scheduleCloseStrip = () => {
+        window.clearTimeout(stripTimer.current);
+        stripTimer.current = window.setTimeout(() => {
+          setStripNow(null);
+          setChildNow(null);
+        }, 200);
+      };
+      const scheduleCloseChild = () => {
+        window.clearTimeout(childTimer.current);
+        childTimer.current = window.setTimeout(() => setChildNow(null), 200);
+      };
+
+      /* 2026-11-24（第25棒）：悬停判定 = 指针坐标 × 最终几何，不依赖 mouseenter / mouseleave。
+         子格是从母格里滑出来的，滑动过程中会从指针下方掠过、浏览器会抖出一串 enter/leave；
+         漏掉一个 enter，整条就在 150ms 后收回去（vv 报的「滑到一级子格上就退回母格」）。 */
+      const syncHover = (x, y) => {
+        if (!openRef.current || phaseRef.current !== 'in') return;
+        const layout = layoutRef.current;
+        if (!layout) return;
+        const gap = layout.gap;
+        const inside = (rect, extra) => !!rect
+          && x >= rect.left - extra && x <= rect.left + rect.width + extra
+          && y >= rect.top - extra && y <= rect.top + rect.height + extra;
+        let group = null;
+        let rowHit = null;
+        let childHit = null;
+        for (let index = 0; index < layout.strips.length; index += 1) {
+          const strip = layout.strips[index];
+          if (!strip.box) continue; /* 没有子格的母格（单一工作区 / 不可用）不参与悬停 */
+          if (inside(layout.cells[strip.cell], 0)) { group = strip.id; break; }
+          if (openStripRef.current !== strip.id) continue;
+          for (let rowIndex = 0; rowIndex < strip.rows.length; rowIndex += 1) {
+            const row = strip.rows[rowIndex];
+            if (row.rowRect && openChildRef.current === row.id && inside(row.rowRect, 0)) {
+              group = strip.id;
+              childHit = row;
+              break;
+            }
+            if (inside(row.rect, 0)) {
+              group = strip.id;
+              rowHit = row;
+              break;
+            }
+          }
+          if (group) break;
+          if (inside(strip.box, gap)) { group = strip.id; break; }
+        }
+        if (!group) {
+          scheduleCloseStrip();
+          scheduleCloseChild();
+          return;
+        }
+        window.clearTimeout(stripTimer.current);
+        window.clearTimeout(childTimer.current);
+        if (openStripRef.current !== group) {
+          setStripNow(group);
+          setChildNow(null);
+        }
+        if (childHit) setChildNow(childHit.id);
+        else if (rowHit) setChildNow(rowHit.modes ? rowHit.id : null);
+      };
+      const syncHoverRef = React.useRef(() => {});
+      syncHoverRef.current = syncHover;
+
+      const openMenu = (x, y) => {
+        let cfg = {};
+        let scale = 1;
+        try {
+          cfg = currentConfig();
+          scale = UI_SCALES[(cfg.ui && cfg.ui.scale) || '2k'] || 1;
+        } catch (error) { scale = 1; }
+        /* 独立设置里的总开关：关掉之后右键长按什么都不做（也不吞宿主的原生菜单） */
+        const settingsNow = superMenuSettings();
+        if (!settingsNow.on) return;
+        const size = Math.max(56, Math.round(SUPER_CELL_BASE * scale));
+        const vvMode = (cfg.vv && cfg.vv.mode) || 'none';
+        const freshMotions = superMotions();
+        motionsRef.current = freshMotions;
+        /* 留白不再手算：用一份摆在原点的布局量出四个方向各要留多少。
+           条摆到哪一格、朝哪边、列表多长，都会自动跟着走（改摆位不用再改 pad）。 */
+        const probe = superLayoutOf({ x: 0, y: 0, size }, {
+          workspaces: workspacesRef.current,
+          motions: freshMotions,
+          components: superComponents(),
+          vvMode,
+          slots: settingsNow.slots,
+          second: settingsNow.second,
+          actionLabels: superActionLabels(),
+          actionIds: Object.keys(SUPER_ACTIONS),
+          pathRows: superPathRows(),
+        });
+        const margin = 10;
+        const padLeft = probe.needs.left + margin;
+        const padRight = probe.needs.right + margin;
+        const padTop = probe.needs.top + margin;
+        const padBottom = probe.needs.bottom + margin;
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        const cx = w < padLeft + padRight ? w / 2 : Math.max(padLeft, Math.min(w - padRight, x));
+        const cy = h < padTop + padBottom ? h / 2 : Math.max(padTop, Math.min(h - padBottom, y));
+        window.clearTimeout(exitTimer.current);
+        window.clearTimeout(readyTimer.current);
+        window.clearTimeout(readyTimer2.current);
+        window.clearTimeout(stripTimer.current);
+        window.clearTimeout(childTimer.current);
+        openRef.current = true;
+        setMenu({ x: cx, y: cy, size });
+        setOpenStrip(null);
+        setOpenChild(null);
+        openStripRef.current = null;
+        openChildRef.current = null;
+        setReadyStage(0);
+        setPhaseSafe('idle');
+        setMotions(freshMotions);
+        /* 「关之前的样子」只在那一层还关着的时候有意义：一旦被预设 / 面板重新打开，旧记忆作废 */
+        if (cfg.vv && cfg.vv.mode && cfg.vv.mode !== 'none') SUPER_LAST_VV = null;
+        window.cancelAnimationFrame(rafRef.current);
+        /* 先画一帧「收起态」，再切到 in，过渡/动画才有起点。
+           母格 1~4 落地（约 285ms）就先放开悬停，5~8 铺完（600ms）再放开剩余的。 */
+        rafRef.current = window.requestAnimationFrame(() => {
+          rafRef.current = window.requestAnimationFrame(() => {
+            setPhaseSafe('in');
+            readyTimer.current = window.setTimeout(() => setReadyStage(1), 300);
+            readyTimer2.current = window.setTimeout(() => setReadyStage(2), SUPER_READY_MS);
+          });
+        });
+        superRefreshWorkspaces().then((items) => {
+          if (!items) return;
+          setWorkspaces(items);
+          workspacesRef.current = items;
+        }).catch(() => { /* ignore */ });
+      };
+
+      React.useEffect(() => {
+        let pending = null;
+        /* 「按右键收菜单」那一按：松手时会紧跟着来一次 contextmenu，要把它压掉 */
+        let dismissPress = false;
+        const clearPending = () => {
+          if (pending) window.clearTimeout(pending.timer);
+          pending = null;
+        };
+        const isBlank = (event) => {
+          const target = event.target;
+          if (!target || typeof target.closest !== 'function') return false;
+          try { return target.closest(SUPER_BLANK_SKIP) === null; } catch (error) { return false; }
+        };
+        const onDown = (event) => {
+          if (event.button !== 2) return;
+          /* 总开关关掉：完全放行，宿主的原生右键菜单照常出 */
+          if (!superMenuSettings().on) return;
+          /* 菜单开着：再按一下右键 = 收起（不再重新呼出），拦住宿主的原生菜单 */
+          if (phaseRef.current === 'in') {
+            event.preventDefault();
+            event.stopPropagation();
+            dismissPress = true;
+            closeMenu();
+            return;
+          }
+          /* 退场动画还没走完：立刻作废，允许马上重新呼出 */
+          if (phaseRef.current === 'out') {
+            window.clearTimeout(exitTimer.current);
+            openRef.current = false;
+            setPhaseSafe('idle');
+            setReadyStage(0);
+            setOpenStrip(null);
+            setOpenChild(null);
+            openStripRef.current = null;
+            openChildRef.current = null;
+          }
+          if (!isBlank(event)) return;
+          clearPending();
+          const x = event.clientX;
+          const y = event.clientY;
+          pending = {
+            timer: window.setTimeout(() => {
+              pending = null;
+              openMenu(x, y);
+            }, SUPER_HOLD_MS),
+          };
+        };
+        const onUp = (event) => {
+          /* 右键只是「呼出」手势：松手不收菜单。
+             以前松手就 closeMenu()，vv 那边表现成「菜单刚出来、鼠标移两格就整个没了」。
+             收菜单只走：Esc / 失焦 / 点空白 / 再按一次右键。 */
+          if (event.button !== 2) return;
+          if (dismissPress) {
+            dismissPress = false;
+            suppressRef.current = Date.now() + 500;
+          }
+          if (pending) clearPending();
+        };
+        const onCancel = () => {
+          /* 浏览器抢走指针（原生拖拽 / 窗口拖动 / 触摸滚动）时只放弃「还没呼出」的长按；
+             已经开着的菜单不受影响。 */
+          clearPending();
+        };
+        const onContext = (event) => {
+          if (pending || Date.now() < suppressRef.current || phaseRef.current !== 'idle') {
+            event.preventDefault();
+            event.stopPropagation();
+          }
+        };
+        const onKey = (event) => {
+          if (event.key === 'Escape' && openRef.current) {
+            event.preventDefault();
+            closeMenu();
+          }
+        };
+        const onBlur = () => {
+          clearPending();
+          closeMenu();
+        };
+        /* 呼出期间与菜单开着的时候都不让浏览器起原生拖拽 */
+        const onDragStart = (event) => {
+          if (!pending && !openRef.current) return;
+          event.preventDefault();
+        };
+        const onMove = (event) => {
+          try { syncHoverRef.current(event.clientX, event.clientY); } catch (error) { /* ignore */ }
+        };
+        window.addEventListener('pointerdown', onDown, true);
+        window.addEventListener('pointerup', onUp, true);
+        window.addEventListener('pointercancel', onCancel, true);
+        window.addEventListener('contextmenu', onContext, true);
+        window.addEventListener('keydown', onKey, true);
+        window.addEventListener('pointermove', onMove, true);
+        window.addEventListener('blur', onBlur);
+        window.addEventListener('dragstart', onDragStart, true);
+        return () => {
+          clearPending();
+          window.clearTimeout(exitTimer.current);
+          window.clearTimeout(readyTimer.current);
+          window.clearTimeout(readyTimer2.current);
+          window.clearTimeout(stripTimer.current);
+          window.clearTimeout(childTimer.current);
+          window.cancelAnimationFrame(rafRef.current);
+          window.removeEventListener('pointerdown', onDown, true);
+          window.removeEventListener('pointerup', onUp, true);
+          window.removeEventListener('pointercancel', onCancel, true);
+          window.removeEventListener('contextmenu', onContext, true);
+          window.removeEventListener('keydown', onKey, true);
+          window.removeEventListener('pointermove', onMove, true);
+          window.removeEventListener('blur', onBlur);
+          window.removeEventListener('dragstart', onDragStart, true);
+        };
+      }, []);
+
+      /* 工作区列表：面板打开时拉一次宿主的注册表（路由是 /dsh-exv-workspaces） */
+      React.useEffect(() => {
+        let alive = true;
+        const load = () => {
+          superRefreshWorkspaces().then((items) => {
+            if (!alive || !items) return;
+            setWorkspaces(items);
+            workspacesRef.current = items;
+          }).catch(() => { /* ignore */ });
+        };
+        load();
+        if (menu) load();
+        return () => { alive = false; };
+      }, [menu]);
+
+      /* 动作列表：菜单打开时读一次；模型切换时 parallax 会发 dsh-exv-live2d-motions */
+      React.useEffect(() => {
+        if (!menu) return undefined;
+        setMotions(superMotions());
+        return undefined;
+      }, [menu]);
+      React.useEffect(() => {
+        const sync = () => setMotions(superMotions());
+        window.addEventListener('dsh-exv-live2d-motions', sync);
+        return () => window.removeEventListener('dsh-exv-live2d-motions', sync);
+      }, []);
+      /* 角色 / 图层开关可能在菜单开着的时候被改（预设、面板），订阅一次保持可用状态正确 */
+      React.useEffect(() => {
+        const store = storeApi();
+        if (!store || typeof store.subscribe !== 'function') return undefined;
+        return store.subscribe(() => setTick((value) => value + 1));
+      }, []);
+
+      const onOverlayDown = (event) => {
+        if (event.button !== 0) return;
+        const target = event.target;
+        const layout = layoutRef.current;
+        if (!target || typeof target.closest !== 'function') { closeMenu(); return; }
+        const modeEl = target.closest('[data-super-mode]');
+        if (modeEl) {
+          event.preventDefault();
+          event.stopPropagation();
+          const parent = modeEl.getAttribute('data-super-mode-parent') || '';
+          const mode = modeEl.getAttribute('data-super-mode') || '';
+          const layerDef = SUPER_LAYERS.find((entry) => entry.id === parent);
+          if (layerDef && layerDef.modes) {
+            if (superLayerSelectMode(parent, mode)) setTick((value) => value + 1);
+          } else if (superSetComponentMode(parent, mode)) {
+            setTick((value) => value + 1);
+          }
+          return;
+        }
+        const toggleEl = target.closest('[data-super-toggle]');
+        if (toggleEl) {
+          event.preventDefault();
+          event.stopPropagation();
+          const kind = toggleEl.getAttribute('data-super-kind');
+          const id = toggleEl.getAttribute('data-super-toggle') || '';
+          if (kind === 'widget') {
+            if (superToggleComponent(id)) setTick((value) => value + 1);
+          } else {
+            toggleLayer(id);
+          }
+          return;
+        }
+        const workspaceEl = target.closest('[data-super-workspace]');
+        if (workspaceEl) {
+          event.preventDefault();
+          event.stopPropagation();
+          superOpenWorkspace(workspaceEl.getAttribute('data-super-workspace') || '');
+          closeMenu();
+          return;
+        }
+        const motionEl = target.closest('[data-super-motion]');
+        if (motionEl) {
+          event.preventDefault();
+          event.stopPropagation();
+          superPlayMotion(motionEl.getAttribute('data-super-motion') || '');
+          setTick((value) => value + 1);
+          return;
+        }
+        const pathEl = target.closest('[data-super-path]');
+        if (pathEl) {
+          event.preventDefault();
+          event.stopPropagation();
+          superOpenPath(pathEl.getAttribute('data-super-path') || '');
+          closeMenu();
+          return;
+        }
+        if (target.closest('[data-super-layers]') || target.closest('[data-super-modes]')) return;
+        const cellEl = target.closest('[data-super-cell]');
+        if (cellEl) {
+          const cellId = cellEl.getAttribute('data-super-cell') || '';
+          const mother = layout && layout.mothers[cellId];
+          if (mother && mother.available) {
+            const feature = layout.slotFeatures[cellId];
+            /* 动作型功能（桌面模式 / 计划 / 目标 / 查询用量 / 充值）：点母格直接执行 */
+            if (superRunAction(feature, menu ? { x: menu.x, y: menu.y } : null)) {
+              closeMenu();
+              return;
+            }
+            /* 只有一个工作区时没有子格，点「工作区」那一格直接在资源管理器里打开 */
+            if (feature === 'workspaces' && workspacesRef.current.length === 1) {
+              superOpenWorkspace(workspacesRef.current[0].path || '');
+              closeMenu();
+            }
+          }
+          return;
+        }
+        const box = layout && layout.footprint;
+        if (box && event.clientX >= box.left && event.clientX <= box.right
+          && event.clientY >= box.top && event.clientY <= box.bottom) return;
+        closeMenu();
+      };
+
+      const cfgNow = currentConfig();
+      const settingsNow = superMenuSettings();
+      const vvMode = (cfgNow.vv && cfgNow.vv.mode) || 'none';
+      const layout = menu ? superLayoutOf(menu, {
+        workspaces,
+        motions,
+        components: superComponents(),
+        vvMode,
+        slots: settingsNow.slots,
+        second: settingsNow.second,
+        actionLabels: superActionLabels(),
+        actionIds: Object.keys(SUPER_ACTIONS),
+        pathRows: superPathRows(),
+        openStrip,
+        openChild,
+      }) : null;
+      layoutRef.current = layout;
+
+      const children = [];
+      if (layout) {
+        const { size, originLeft, originTop, square } = layout;
+        children.push(h('div', {
+          key: 'frame',
+          className: 'dsh-super-frame',
+          style: { left: originLeft, top: originTop, width: size, height: size },
+        }));
+
+        /* ---------- 8 个母格（5~8 可以在设置里关掉）：只画摆位表里启用的那几格 ---------- */
+        layout.cellList.forEach((cell, index) => {
+          const mother = layout.mothers[cell.id];
+          const featureId = layout.slotFeatures[cell.id];
+          const label = mother ? mother.label : '';
+          /* 菜单里的母格：图标是主角（38% 边长），名字缩小放在图标下面。
+             空格子什么都不画——早期那些 1~8 的编号只是占位，已经去掉。 */
+          const icon = featureId
+            ? h('span', { key: 'icon', className: 'dsh-super-cell-icon' }, superFeatureIcon(featureId, Math.round(size * 0.38)))
+            : null;
+          const off = Boolean(mother && !mother.available);
+          const forced = Boolean(mother && mother.available && mother.strip.box && openStrip === mother.strip.id);
+          children.push(h('div', {
+            key: cell.id,
+            className: 'dsh-super-cell',
+            'data-super-cell': cell.id,
+            'data-diag': cell.from ? '' : undefined,
+            'data-forced': forced ? '' : undefined,
+            'data-off': off ? '' : undefined,
+            title: off ? label + '（当前不可用）' : (featureId ? label : ''),
+            style: {
+              left: originLeft,
+              top: originTop,
+              width: size,
+              height: size,
+              '--dx': (cell.dx * layout.step) + 'px',
+              '--dy': (cell.dy * layout.step) + 'px',
+              '--fx': (cell.from ? cell.from[0] * layout.step : 0) + 'px',
+              '--fy': (cell.from ? cell.from[1] * layout.step : 0) + 'px',
+              animationDelay: (phase === 'in' ? (cell.from ? 390 + (index - 4) * 30 : 75 + index * 30) : 0) + 'ms',
+            },
+            onMouseEnter: mother && mother.available && mother.strip.box ? () => openStripNow(mother.strip.id) : undefined,
+          }, featureId ? [
+            icon,
+            h('span', { key: 'label', className: 'dsh-super-cell-label' }, label),
+          ] : null));
+        });
+
+        /* ---------- 四条一级子格（图层 / 组件 / 工作区 / 动作） ---------- */
+        layout.strips.forEach((strip) => {
+          if (!strip.box) return;
+          const open = openStrip === strip.id;
+          const rows = [];
+          strip.rows.forEach((row, index) => {
+            const rowClass = strip.kind === 'motion' ? 'dsh-super-layer dsh-super-layer-motion' : 'dsh-super-layer';
+            const rowOn = strip.kind === 'layer' ? superLayerOn(row.id, cfgNow) : row.on;
+            const attrs = {
+              key: 'row-' + row.id,
+              className: rowClass,
+              'data-open': open ? '' : undefined,
+              title: strip.kind === 'layer' ? ((rowOn ? '关闭' : '打开') + row.label) : row.title,
+              style: {
+                left: row.rect.left - strip.box.left,
+                top: row.rect.top - strip.box.top,
+                width: row.rect.width,
+                height: row.rect.height,
+                '--ly': row.ly + 'px',
+                transitionDelay: open ? (index * 30) + 'ms' : '0ms',
+              },
+            };
+            if (strip.kind === 'layer' || strip.kind === 'widget') {
+              attrs['data-super-toggle'] = row.id;
+              attrs['data-super-kind'] = strip.kind;
+            } else if (strip.kind === 'workspace') {
+              attrs['data-super-workspace'] = (row.workspace && row.workspace.path) || '';
+            } else if (strip.kind === 'motion') {
+              attrs['data-super-motion'] = (row.motion && row.motion.name) || '';
+            } else if (strip.kind === 'path') {
+              attrs['data-super-path'] = row.path || '';
+            }
+            rows.push(h('div', attrs,
+              h('span', { className: 'dsh-super-layer-name' }, row.label),
+              strip.kind === 'layer' || strip.kind === 'widget'
+                ? h('span', { className: 'dsh-super-layer-sw', 'data-on': rowOn ? '' : undefined })
+                : (row.tag ? h('span', { className: 'dsh-super-layer-tag' }, row.tag) : null)));
+            if (row.modes && row.rowRect) {
+              const rowLeft = row.rowRect.left - strip.box.left;
+              const childOpen = openChild === row.id;
+              rows.push(h('div', {
+                key: 'modes-' + row.id,
+                className: 'dsh-super-modes',
+                'data-super-modes': row.id,
+                'data-open': childOpen ? '' : undefined,
+                style: {
+                  left: rowLeft,
+                  top: row.rowRect.top - strip.box.top,
+                  width: row.rowRect.width,
+                  height: row.rowRect.height,
+                },
+              }, row.modes.map((mode, modeIndex) => {
+                const relLeft = modeIndex * (square + layout.gap);
+                const collapseX = (size / 2) - (rowLeft + relLeft + square / 2);
+                return h('div', {
+                  key: mode.id,
+                  className: 'dsh-super-square',
+                  'data-super-mode': mode.id,
+                  'data-super-mode-parent': row.id,
+                  'data-on': (strip.kind === 'layer'
+                    ? superLayerModeOn(row.id, mode.id, cfgNow)
+                    : row.mode === mode.id) ? '' : undefined,
+                  'data-open': childOpen ? '' : undefined,
+                  title: mode.label,
+                  style: {
+                    left: relLeft,
+                    top: 0,
+                    width: square,
+                    height: square,
+                    '--lx': collapseX + 'px',
+                    transitionDelay: childOpen ? (modeIndex * 25) + 'ms' : '0ms',
+                  },
+                }, h('span', { className: 'dsh-super-square-label' }, mode.label));
+              })));
+            }
+          });
+          children.push(h('div', {
+            key: strip.id,
+            className: 'dsh-super-layers',
+            'data-super-layers': strip.id,
+            'data-open': open ? '' : undefined,
+            style: {
+              left: strip.box.left,
+              top: strip.box.top,
+              width: strip.box.width,
+              height: strip.box.height,
+            },
+          }, rows));
+        });
+      }
+
+      const overlay = h('div', {
+        className: 'dsh-super-overlay',
+        'data-super-menu': '',
+        'data-state': phase,
+        'data-ready': readyStage > 0 ? String(readyStage) : undefined,
+        onPointerDown: onOverlayDown,
+        onContextMenu: (event) => event.preventDefault(),
+      },
+        h('div', { key: 'dim', className: 'dsh-super-dim' }),
+        children);
+      return createPortal ? createPortal(overlay, document.body) : overlay;
+    }
+
     function ThemeEnhancer() {
       const [dividerLeft, setDividerLeft] = React.useState(null);
       const [editing, setEditing] = React.useState(false);
@@ -8021,7 +10332,80 @@ const VV_OPTIONS = [
           return previous.filter((item) => item !== id);
         });
       };
+      /* 超级全局菜单的「组件」条要能一口气全关 / 恢复上一次的显隐组合。
+         读的时候走 ref，保证同一次渲染里就能看到刚改过的值（effect 里的闭包会慢一拍）。 */
+      const hiddenWidgetsRef = React.useRef(hiddenWidgets);
+      hiddenWidgetsRef.current = hiddenWidgets;
+      React.useEffect(() => {
+        const allIds = WIDGET_REGISTRY.map((item) => item.id);
+        const componentDefs = WIDGET_REGISTRY.filter((item) => !item.group || item.id === CLIP_IDS[0]);
+        const current = () => hiddenWidgetsRef.current || [];
+        const membersOf = (def) => (def.group ? CLIP_IDS : [def.id]);
+        const notepadMode = () => {
+          try { return window.localStorage.getItem(NP_MODE_KEY) === 'todo' ? 'todo' : 'note'; } catch (error) { return 'note'; }
+        };
+        window.__DSH_EXV_WIDGETS__ = {
+          isOn: () => allIds.some((id) => current().indexOf(id) < 0),
+          hidden: () => current().slice(),
+          hideAll: () => setHiddenWidgets(allIds.slice()),
+          showAll: () => setHiddenWidgets([]),
+          setHidden: (ids) => {
+            const wanted = Array.isArray(ids) ? ids.filter((id) => allIds.indexOf(id) >= 0) : [];
+            setHiddenWidgets(wanted);
+          },
+          /* 2.9.0：超级全局菜单「母格 2 · 组件」用——5 个组件各自的开关 + 单选模式 */
+          components: () => componentDefs.map((def) => {
+            const members = membersOf(def);
+            const modeDef = WIDGET_MODES[def.id];
+            const modes = def.id === 'notepad'
+              ? [{ id: 'note', label: '笔记' }, { id: 'todo', label: '待办' }]
+              : (modeDef ? modeDef.options.map((option) => ({ id: option.id, label: option.label })) : []);
+            const mode = def.id === 'notepad'
+              ? notepadMode()
+              : (widgetModesRef.current[def.id] || (modeDef && modeDef.defaultMode) || '');
+            return {
+              id: def.id,
+              label: def.editLabel || def.label,
+              on: members.some((id) => current().indexOf(id) < 0),
+              mode,
+              modes,
+            };
+          }),
+          toggleComponent: (id) => {
+            const def = componentDefs.find((item) => item.id === id);
+            if (!def) return false;
+            const members = membersOf(def);
+            const on = members.some((member) => current().indexOf(member) < 0);
+            setHiddenWidgets((previous) => {
+              const list = previous || [];
+              if (on) return Array.from(new Set(list.concat(members)));
+              return list.filter((member) => members.indexOf(member) < 0);
+            });
+            return true;
+          },
+          setComponentMode: (id, mode) => {
+            if (id === 'notepad') {
+              const next = mode === 'todo' ? 'todo' : 'note';
+              /* 记事本组件没挂载时也得记住；挂载时它自己会再写一次 */
+              try { window.localStorage.setItem(NP_MODE_KEY, next); } catch (error) { /* ignore */ }
+              try { window.dispatchEvent(new CustomEvent('dsh-exv-notepad-mode', { detail: { mode: next } })); } catch (error) { /* ignore */ }
+              return true;
+            }
+            const def = WIDGET_MODES[id];
+            if (!def || !def.options.some((option) => option.id === mode)) return false;
+            setWidgetMode(id, mode);
+            return true;
+          },
+        };
+        return () => {
+          try { delete window.__DSH_EXV_WIDGETS__; } catch (error) { /* ignore */ }
+        };
+      }, []);
       const [widgetModes, setWidgetModes] = React.useState(readWidgetModes);
+      /* 注意：这个 ref 必须排在 widgetModes 的 useState 之后——
+         写在前面会撞上 TDZ（Cannot access 'widgetModes' before initialization），整个主题当场白屏。 */
+      const widgetModesRef = React.useRef(widgetModes);
+      widgetModesRef.current = widgetModes;
       React.useEffect(() => {
         try {
           window.localStorage.setItem(WIDGET_MODE_KEY, JSON.stringify(widgetModes));
@@ -9215,10 +11599,36 @@ const VV_OPTIONS = [
           scale: sizeScale,
         };
       })();
-      const toolScan = () => {
+      const toolScan = (origin) => {
         if (!window.__dshScanWave) return;
-        window.__dshScanWave(window.innerWidth, window.innerHeight);
+        /* 2.9.0：超级菜单里的桌面模式让扫描波从菜单中心起飞；三小只那颗仍从右下角起 */
+        const x = origin && Number.isFinite(origin.x) ? origin.x : window.innerWidth;
+        const y = origin && Number.isFinite(origin.y) ? origin.y : window.innerHeight;
+        window.__dshScanWave(x, y);
       };
+      /* 桌面模式的唯一开关逻辑：三小只那颗按钮和超级菜单母格都走这里 */
+      const desktopOpenRef = React.useRef(false);
+      desktopOpenRef.current = desktopOpen;
+      const applyDesktopMode = (next, origin) => {
+        if (next && !desktopOpenRef.current) toolScan(origin);
+        desktopOpenRef.current = next;
+        setDesktopOpen(next);
+      };
+      React.useEffect(() => {
+        window.__DSH_EXV_TOOLS__ = {
+          desktop: () => desktopOpenRef.current,
+          toggleDesktop: (origin) => {
+            const next = !desktopOpenRef.current;
+            if (next) toolScan(origin);
+            desktopOpenRef.current = next;
+            setDesktopOpen(next);
+            return next;
+          },
+        };
+        return () => {
+          try { delete window.__DSH_EXV_TOOLS__; } catch (error) { /* ignore */ }
+        };
+      }, []);
       /* 点过的按钮先别弹提示：等到下一次重新悬停再显示 */
       const muteToolHint = (event) => {
         const el = event && event.currentTarget;
@@ -9350,11 +11760,7 @@ const VV_OPTIONS = [
               'data-active': desktopOpen ? '' : undefined,
               onPointerDown: muteToolHint,
               onClick: () => {
-                const next = !desktopOpen;
-                if (next) toolScan();
-                setDesktopOpen(next);
-                if (next) document.body.setAttribute('data-dsh-desktop', '');
-                else document.body.removeAttribute('data-dsh-desktop');
+                applyDesktopMode(!desktopOpen);
               },
               title: desktopOpen ? '退出桌面模式' : '桌面模式',
             },
@@ -9658,6 +12064,7 @@ const VV_OPTIONS = [
       return h(React.Fragment, null,
         floating,
         floatNode,
+        h(SuperMenu, { key: 'super-menu' }),
         panelOpen ? h(BackgroundEditor, { store: window.__DSH_EXV__, onClose: () => setPanelOpen(false) }) : null,
       );
     }
